@@ -85,7 +85,7 @@ busLayoutSchema.statics = {
         seat_numbers:item.seat_numbers,
         combine_seats:item.combine_seats,
         name: item.name,
-        status: item.status == true ? "Active" : "Inactive",
+        status: item.status,
         createdAt: moment.utc(item.createdAt).tz(DEFAULT_TIMEZONE).format("DD MMM YYYY"),
       });
     });
@@ -94,15 +94,15 @@ busLayoutSchema.statics = {
   layoutName(name){
     if(name == 'layout-1'){
       return '1 X 1';
-    }else if(name == 'layout-2'){
+    }if(name == 'layout-2'){
       return '1 X 2';
-    }else if(name == 'layout-3'){
+    }if(name == 'layout-3'){
       return '2 X 1';
-    }else if(name == 'layout-4'){
+    }if(name == 'layout-4'){
       return '2 X 2';
-    }else if(name == 'layout-5'){
+    }if(name == 'layout-5'){
       return '2 X 3';
-    }else if(name == 'layout-6'){
+    }if(name == 'layout-6'){
       return '3 X 2';
     }
   }

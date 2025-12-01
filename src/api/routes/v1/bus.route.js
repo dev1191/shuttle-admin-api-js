@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const Validate = require('../../middlewares/validator');
 const controller = require('../../controllers/bus.controller');
 const {
@@ -8,7 +9,6 @@ const {
 } = require('../../middlewares/auth');
 const { busValidation } = require('../../validations');
 
-const multer = require('multer');
 
 const upload = multer({});
 
@@ -26,14 +26,15 @@ router
   
 router
   .route('/')
-  .get(getAuth('bus.load', 'master.admin'), controller.load)
+   .get(getAuth('bus.view', 'master.admin'), Validate(busValidation.listBuses), controller.list)
   .post(getAuth('bus.create', 'master.admin'), Validate(busValidation.createBuses), controller.create);
 
 
 router
-  .route('/search')
-  .get(getAuth('bus.view', 'master.admin'), Validate(busValidation.listBuses), controller.list);
-
+  .route('/load')
+  
+  .get(getAuth('bus.load', 'master.admin'), controller.load);
+ 
 
 router
   .route('/:busId')

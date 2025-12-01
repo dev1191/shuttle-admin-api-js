@@ -9,12 +9,12 @@ const router = express.Router();
 
 router
   .route('/')
-  .get(getAuth('bus.layout.view', 'master.admin'), controller.load)
+  .get(getAuth('bus.layout.view', 'master.admin'), Validate(buslayoutValidation.listBusLayouts), controller.list)
   .post(getAuth('bus.layout.create', 'master.admin'), Validate(buslayoutValidation.createBusLayouts), controller.create);
 
 router
-  .route('/search')
-  .get(getAuth('bus.layout.view', 'master.admin'), Validate(buslayoutValidation.listBusLayouts), controller.list);
+  .route('/load')
+  .get(getAuth('bus.layout.view', 'master.admin'), controller.load);
 
 
 router

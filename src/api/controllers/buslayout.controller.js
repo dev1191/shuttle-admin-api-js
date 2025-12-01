@@ -69,25 +69,20 @@ const Bus = require("../models/bus.model");
  exports.list = async (req, res, next) => {
   try {
     const condition = req.query.search
-    ?
-    {
+    ? {
       $or: [
         { name: { $regex: new RegExp(req.query.search), $options: 'i' } },
         { max_seats: { $regex: new RegExp(req.query.search), $options: 'i' } },
         {layout : { $regex: new RegExp(req.query.search), $options: 'i' } },
-        { status: req.query.search != 'inactive'},
-        { last_seat: req.query.search != false},
       ],
     }
     : {};
 
-  let sort = {};
-  if (!req.query.sort) {
-    sort = { _id: -1 };
-  } else {
-    const data = JSON.parse(req.query.sort);
-    sort = { [data.name]: (data.order != 'none') ? data.order : 'asc' };
-  }
+    let sort = {};
+    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
+    } 
+
 
   const paginationoptions = {
     page: req.query.page || 1,
@@ -95,15 +90,15 @@ const Bus = require("../models/bus.model");
     collation: { locale: 'en' },
     customLabels: {
       totalDocs: 'totalRecords',
-      docs: 'buslayouts',
+      docs: 'items',
     },
     sort,
     lean: true,
   };
 
   const result = await BusLayout.paginate(condition, paginationoptions);
-  result.buslayouts = BusLayout.transformData(result.buslayouts)
-  res.json({ data: result });
+  result.items = BusLayout.transformData(result.items)
+  res.json(result);
 
   }catch(error){
     next(error);
@@ -154,14 +149,13 @@ const Bus = require("../models/bus.model");
         BusLayout.deleteOne({
           _id: req.params.buslayoutId,
         })
-          .then(() =>
-            res.status(httpStatus.OK).json({
+          .then(() => res.status(httpStatus.OK).json({
               status: true,
               message: "Bus layout deleted successfully.",
             })
           )
-          .catch(e => next(e));
+          .catch((e) => next(e));
       }
     })
-    .catch(e => next(e));
+    .catch((e) => next(e));
 };

@@ -1,14 +1,14 @@
 const httpStatus = require("http-status");
 const { omit, isEmpty } = require("lodash");
+const { VARIANT_ALSO_NEGOTIATES } = require("http-status");
+const { v4: uuidv4 } = require("uuid");
 const Listeners = require("../events/Listener");
 const Bus = require("../models/bus.model");
 const Route = require("../models/route.model");
 const busSchedule = require("../models/busSchedule.model");
 const Bus_galleries = require("../models/busGallaries.model");
 const {imageDelete,imageUpload } = require("../services/uploaderService");
-const { VARIANT_ALSO_NEGOTIATES } = require("http-status");
 
-const  { v4: uuidv4 }  = require("uuid");
 
 
 /**
@@ -529,27 +529,12 @@ exports.list = async (req, res, next) => {
 
 
     let sort = {};
-    if (!req.query.sort) {
-      sort = { createdAt: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = { [data.name]: data.order != "none" ? data.order : "asc" };
-    }
+    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
+    } 
 
 
-    if (req.query.filters) {
-      const filtersData = JSON.parse(req.query.filters);
-      if (filtersData.type == "simple") {
-          condition = {
-            [filtersData.name]: filtersData.text,
-          };
-        
-      } else if (filtersData.type == "select") {
-        condition = {
-          [filtersData.name]: { $in: filtersData.selected_options },
-        };
-      }
-    }
+
 
     const aggregateQuery = Bus.aggregate([
       {
@@ -607,13 +592,7 @@ exports.list = async (req, res, next) => {
           certificate_insurance: 1,
           certificate_fitness:1,
           certificate_permit: 1,
-          status:{
-            $cond: {
-              if: { $eq: ["$status", true] },
-              then: "Active",
-              else: "Inactive",
-            },
-          },
+          status:1,
           createdAt:1
         }
       },
@@ -628,32 +607,13 @@ exports.list = async (req, res, next) => {
       collation: { locale: "en" },
       customLabels: {
         totalDocs: "totalRecords",
-        docs: "buses",
+        docs: "items",
       },
       sort,
     };
 
     const result = await Bus.aggregatePaginate(aggregateQuery, options);
-
-    //    console.log('1212', sort);
-    // const paginationoptions = {
-    //   page: req.query.page || 1,
-    //   limit: req.query.limit || 10,
-    //   collation: { locale: "en" },
-    //   customLabels: {
-    //     totalDocs: "totalRecords",
-    //     docs: "buses",
-    //   },
-    //   sort,
-    //   populate: [{path:"adminId",select:'firstname'},{path:"buslayoutId",select:'name max_seats'},{path:"bustypeId",select:'name'}],
-    //   lean: true,
-    //   leanWithId: true,
-    // };
-    
-    
-    // const result = await Bus.paginate(condition, paginationoptions);
-    // result.buses = Bus.transformDataLists(result.buses);
-    res.json({ data: result });
+    res.json(result);
   } catch (error) {
     next(error);
   }
