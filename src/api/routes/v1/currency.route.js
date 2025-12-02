@@ -19,7 +19,7 @@ router
     controller.list
   );
 
-router.route("/list").get(controller.fetchCurrency);
+router.route("/load").get(controller.fetchCurrency);
 
 router
   .route("/:currencyId")

@@ -1,11 +1,11 @@
 const httpStatus = require('http-status');
+const { v4: uuidv4 } = require("uuid");
+const moment = require("moment-timezone");
 const schedule = require("../services/schedule");
 const { imageDelete, imageUpload } = require("../services/uploaderService");
-const  { v4: uuidv4 }  = require("uuid");
 const ScheduledNotification = require("../models/scheduledNotification.model");
 const firebaseUser = require('../services/firebaseUser');
 const User = require("../models/user.model");
-const moment = require("moment-timezone");
 
 /**
  * get notifications list
@@ -44,26 +44,15 @@ exports.list = async (req, res, next) => {
             collation: { locale: 'en' },
             customLabels: {
                 totalDocs: 'totalRecords',
-                docs: 'notifications',
+                docs: 'items',
             },
             sort,
             lean: true,
         };
 
         const result = await ScheduledNotification.paginate(condition, paginationoptions);
-        result.notifications = ScheduledNotification.transformData(result.notifications)
-        res.json({ data: result });
-
-        // const list = schedule.getJobs();
-        // const keys = Object.keys(list);
-        // let schedules = await ScheduledNotification.find({});
-        // schedules = schedules.filter((item) =>
-        //     keys.includes(item._id.toString()));
-        // res.json({
-        //     data: { schedules },
-        //     status: "success",
-        //     message: "successfull",
-        // });
+        result.items = ScheduledNotification.transformData(result.items)
+        res.json(result);
 
 
     } catch (error) {

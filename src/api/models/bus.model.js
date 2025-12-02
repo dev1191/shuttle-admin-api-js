@@ -4,9 +4,9 @@ const { Schema } = mongoose;
 const { ObjectId } = Schema;
 const httpStatus = require("http-status");
 const { omitBy, isNil } = require("lodash");
-const APIError = require("../utils/APIError");
 const paginateAggregate = require('mongoose-aggregate-paginate-v2');
 const moment = require('moment-timezone');
+const APIError = require("../utils/APIError");
 /**
  * Bus Schema
  * @private
@@ -63,7 +63,13 @@ const busSchema = new mongoose.Schema({
     certificate_insurance: { type: String },
     certificate_fitness: { type: String },
     certificate_permit: { type: String },
-    status: { type: Boolean, default: true },
+    // Status changed from boolean -> enum. Possible values:
+    // 'active', 'OnRoute', 'Idle', 'Maintance', 'Breakdown', 'inactive'
+    status: {
+        type: String,
+        enum: ['Active', 'OnRoute', 'Idle', 'Maintance', 'Breakdown', 'Inactive'],
+        default: 'Active',
+    },
 }, {
     timestamps: true,
 });
@@ -139,6 +145,16 @@ busSchema.statics = {
         const selectableItems = [];
         const i = 1;
         data.forEach((item) => {
+            // normalize status for display (handle legacy boolean and new enum)
+            let statusVal = item.status;
+            let statusLabel = 'Inactive';
+            if (typeof statusVal === 'boolean') {
+                statusLabel = statusVal ? 'Active' : 'Inactive';
+            } else if (statusVal) {
+                statusLabel = String(statusVal);
+                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+            }
+
             selectableItems.push({
                 value: item._id,
                 text: item.name + ' - ' + item.buslayoutId.max_seats + ' seats'
@@ -195,7 +211,7 @@ busSchema.statics = {
                 certificate_insurance: item.certificate_insurance,
                 certificate_fitness: item.certificate_fitness,
                 certificate_permit: item.certificate_permit,
-                status: item.status == true ? "Active" : "Inactive",
+                status: statusLabel,
                 createdAt: moment.utc(item.createdAt).tz(DEFAULT_TIMEZONE).format("DD MMM YYYY"),
             });
         });

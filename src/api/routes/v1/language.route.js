@@ -19,7 +19,7 @@ router
     controller.list
   );
 
-router.route("/list").get(controller.fetchLanguage);
+router.route("/load").get(controller.fetchLanguage);
 
 router
   .route("/:languageId")

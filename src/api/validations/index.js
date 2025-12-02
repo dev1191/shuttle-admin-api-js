@@ -18,6 +18,7 @@ const countryValidation = require('./country.validation');
 const notificationValidation = require('./notification.validation');
 const walletValidation = require('./wallet.validation');
 const AgentValidation = require('./agent.validation');
+const AdminValidation = require('./admin.validation');
 
 module.exports = {
   authValidation,
@@ -40,4 +41,5 @@ module.exports = {
   notificationValidation,
   walletValidation,
   AgentValidation,
+  AdminValidation,
 };

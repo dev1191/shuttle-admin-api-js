@@ -59,6 +59,7 @@ const adminSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
+    country_code:{type:String,default:'91'},
     phone: {
       type: String,
       trim: true,

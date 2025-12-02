@@ -7,12 +7,11 @@ const { getAuth } = require('../../middlewares/auth');
 const router = express.Router();
 
 
-router
-  .route('/search')
-  .get(getAuth('notification.view', 'master.admin'), controller.list);
+
 
 router
   .route('/')
+  .get(getAuth('notification.view', 'master.admin'), controller.list)
   .post(getAuth('notification.create', 'master.admin'), controller.create);
 
 router
@@ -21,7 +20,7 @@ router
 /**
    * update the single location
    * */
-  .patch(getAuth('notification.edit', 'master.admin'), controller.updateStatus)
+  .put(getAuth('notification.edit', 'master.admin'), controller.updateStatus)
 // /**
 //   * delete  the single location
 //   * */

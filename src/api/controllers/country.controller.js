@@ -44,7 +44,7 @@ exports.load = async (req, res, next) => {
     const result = await Country.find(condition).lean();
     res.status(httpStatus.OK);
     res.json({
-      total_count: result.length,
+      totalCount: result.length,
       items: await Country.formatCountry(result),
     });
   } catch (error) {

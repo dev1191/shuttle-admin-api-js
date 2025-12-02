@@ -1,8 +1,9 @@
 const httpStatus = require("http-status");
 const mongoose = require("mongoose");
 const Admin = require("../models/admin.model");
+const Role = require("../models/role.model");
 const AdminDetail = require("../models/adminDetail.model");
-
+const slug = require("slug");
 const Listeners = require("../events/Listener");
 const APIError = require("../utils/APIError");
 const emailProvider = require("../services/emails/emailProvider");
@@ -51,7 +52,6 @@ exports.lists = async (req, res, next) => {
                     $options: "i",
                   },
                 },
-                { status: req.query.search != "inactive" },
               ],
             },
             { role: { $ne: "operator" } },
@@ -60,9 +60,10 @@ exports.lists = async (req, res, next) => {
       : { role: { $ne: "operator" } };
 
     let sort = {};
-    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
       sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
-    } 
+    }
+
     let newquery = {};
     if (req.query.createdAt) {
       const date = new Date(req.query.createdAt[0]);
@@ -71,11 +72,13 @@ exports.lists = async (req, res, next) => {
         $gte: date,
         $lt: nextDate,
       };
-      newquery.is_deleted = false;
     } else if (req.query.status) {
-      newquery.status = req.query.status ? true: false;
-      newquery.is_deleted = false;
-    }
+      newquery.is_active = req.query.status;
+    } else if (typeof req.query.status === 'boolean' && !req.query.status) {
+      newquery.is_active = req.query.status;
+    } 
+
+    console.log("newquery", newquery);
     condition = { ...condition, ...newquery };
 
     const aggregateQuery = Admin.aggregate([
@@ -108,6 +111,8 @@ exports.lists = async (req, res, next) => {
           ids: "$_id",
           id: 1,
           picture: 1,
+          firstname: 1,
+          lastname: 1,
           fullname: { $concat: ["$firstname", " ", "$lastname"] },
           short_name: {
             $toUpper: {
@@ -119,159 +124,8 @@ exports.lists = async (req, res, next) => {
           },
           email: 1,
           phone: 1,
+          country_code: 1,
           role: 1,
-          address_1: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.address_1",
-                  else: "$admin_detail.address_1",
-                },
-              },
-              "",
-            ],
-          },
-          address_2: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.address_2",
-                  else: "$admin_detail.address_2",
-                },
-              },
-              "",
-            ],
-          },
-          city: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.city",
-                  else: "$admin_detail.city",
-                },
-              },
-              "",
-            ],
-          },
-          contact_no: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.contact_no",
-                  else: "$admin_detail.contact_no",
-                },
-              },
-              "",
-            ],
-          },
-          pincode: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.pincode",
-                  else: "$admin_detail.pincode",
-                },
-              },
-              "",
-            ],
-          },
-          company: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.company",
-                  else: "$admin_detail.company",
-                },
-              },
-              "",
-            ],
-          },
-          is_agent: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.is_agent",
-                  else: "$admin_detail.is_agent",
-                },
-              },
-              "",
-            ],
-          },
-          commission: {
-            $ifNull: [
-              {
-                $cond: {
-                  if: { $eq: ["$admin_detail.is_agent", true] },
-                  then: "$admin_detail.commission",
-                  else: "$admin_detail.commission",
-                },
-              },
-              "",
-            ],
-          },
-          document_gst_certificate: {
-            $cond: [
-              {
-                $regexMatch: {
-                  input: "$document_gst_certificate",
-                  regex: /^(http|https):\/\//,
-                },
-              },
-              "$document_gst_certificate",
-              {
-                $cond: [
-                  {
-                    $regexMatch: {
-                      input: "$document_gst_certificate",
-                      regex: /^(default):\/\//,
-                    },
-                  },
-                  `${process.env.BASEURL}:${process.env.PORT}/public/admin/documents/default.jpg`,
-                  {
-                    $concat: [
-                      `${process.env.BASEURL}:${process.env.PORT}/public/admin/documents/`,
-                      "$document_gst_certificate",
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-          document_pan_card: {
-            $cond: [
-              {
-                $regexMatch: {
-                  input: "$document_pan_card",
-                  regex: /^(http|https):\/\//,
-                },
-              },
-              "$document_pan_card",
-              {
-                $cond: [
-                  {
-                    $regexMatch: {
-                      input: "$document_pan_card",
-                      regex: /^(default):\/\//,
-                    },
-                  },
-                  `${process.env.BASE_URL}:${process.env.PORT}/public/admin/documents/default.jpg`,
-                  {
-                    $concat: [
-                      `${process.env.BASE_URL}:${process.env.PORT}/public/admin/documents/`,
-                      "$document_pan_card",
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
           last_login: 1,
           is_active: 1,
           createdAt: 1,
@@ -300,29 +154,12 @@ exports.lists = async (req, res, next) => {
 
     const result = await Admin.aggregatePaginate(aggregateQuery, options);
 
-    // const paginationoptions = {
-    //   page: req.query.page || 1,
-    //   limit: req.query.limit || 10,
-    //   collation: { locale: 'en' },
-    //   customLabels: {
-    //     totalDocs: 'totalRecords',
-    //     docs: 'users',
-    //   },
-    //   sort,
-    //   populate: 'admin_details',
-    //   lean: true,
-    //   leanWithId: true,
-    // };
-    // console.log('paginationoptions', paginationoptions);
-    // const result = await Admin.paginate(condition, paginationoptions);
-    // result.users = Admin.transformData(result.users);
     res.json(result);
   } catch (error) {
     console.log("error111", error);
     next(error);
   }
 };
-
 
 /**
  * Create new admin
@@ -338,16 +175,10 @@ exports.create = async (req, res, next) => {
       phone,
       contact_no,
       is_active,
-      address_1,
-      address_2,
-      company,
-      city,
-      pincode,
-      picture,
-      document_gst_certificate,
-      document_pan_card,
+      country_code,
     } = req.body;
-    const FolderName = role == "operator"
+    const FolderName =
+      role == "operator"
         ? process.env.S3_BUCKET_AGENTDOC
         : process.env.S3_BUCKET_USERPRO;
     const objadmin = {
@@ -428,14 +259,113 @@ exports.create = async (req, res, next) => {
   }
 };
 
+/**
+ * Update new admin
+ * @public
+ */
+exports.update = async (req, res, next) => {
+  try {
+    const adminId = req.params.adminId;
 
+    const {
+      firstname,
+      lastname,
+      email,
+      role,
+      phone,
+      contact_no,
+      is_active,
+      country_code,
+      // admin detail fields
+      address_1,
+      address_2,
+      city,
+      pincode,
+      is_agent,
+      company,
+      commission,
+      document_gst_certificate,
+      document_pan_card,
+      picture,
+    } = req.body;
+
+    // Build update object for Admin (only include provided fields)
+    const adminUpdate = {};
+    if (typeof firstname !== "undefined") adminUpdate.firstname = firstname;
+    if (typeof lastname !== "undefined") adminUpdate.lastname = lastname;
+    if (typeof email !== "undefined") adminUpdate.email = email;
+
+    if (typeof phone !== "undefined") adminUpdate.phone = phone;
+    if (typeof country_code !== "undefined")
+      adminUpdate.country_code = country_code;
+    if (typeof is_active !== "undefined") adminUpdate.is_active = is_active;
+    if (typeof picture !== "undefined") adminUpdate.picture = picture;
+
+    if (typeof role !== "undefined") {
+      adminUpdate.role = role;
+      const getRoleId = await Role.findOne({ slug: slug(role) }).lean();
+      adminUpdate.roleId = getRoleId._id;
+    }
+    // Update Admin
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      new mongoose.Types.ObjectId(adminId),
+      { $set: adminUpdate },
+      { new: true }
+    ).exec();
+
+    if (!updatedAdmin) {
+      throw new APIError({
+        message: "Admin not found",
+        status: httpStatus.NOT_FOUND,
+      });
+    }
+
+    // Build admin detail update and upsert
+    const adminDetailUpdate = {};
+    if (typeof contact_no !== "undefined")
+      adminDetailUpdate.contact_no = contact_no;
+    if (typeof address_1 !== "undefined")
+      adminDetailUpdate.address_1 = address_1;
+    if (typeof address_2 !== "undefined")
+      adminDetailUpdate.address_2 = address_2;
+    if (typeof city !== "undefined") adminDetailUpdate.city = city;
+    if (typeof pincode !== "undefined") adminDetailUpdate.pincode = pincode;
+    if (typeof is_agent !== "undefined") adminDetailUpdate.is_agent = is_agent;
+    if (typeof company !== "undefined") adminDetailUpdate.company = company;
+    if (typeof commission !== "undefined")
+      adminDetailUpdate.commission = commission;
+    if (typeof document_gst_certificate !== "undefined")
+      adminDetailUpdate.document_gst_certificate = document_gst_certificate;
+    if (typeof document_pan_card !== "undefined")
+      adminDetailUpdate.document_pan_card = document_pan_card;
+
+    if (Object.keys(adminDetailUpdate).length > 0) {
+      await AdminDetail.findOneAndUpdate(
+        { adminId: updatedAdmin._id },
+        { $set: adminDetailUpdate },
+        { upsert: true, new: true }
+      ).exec();
+    }
+
+    res.status(httpStatus.OK);
+    res.json({
+      status: true,
+      message: "Admin updated successfully.",
+      admin: updatedAdmin.transform(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 /**
  * Delete Admin
  * @public
  */
 exports.remove = (req, res, next) => {
   Admin.deleteOne({ _id: req.params.adminId })
-    .then(() => AdminDetail.deleteOne({ adminId: req.params.adminId }).then(() => res.status(httpStatus.OK).json({
+    .then(() =>
+      AdminDetail.deleteOne({ adminId: req.params.adminId }).then(() =>
+        res.status(httpStatus.OK).json({
           status: true,
           message: " deleted successfully.",
         })

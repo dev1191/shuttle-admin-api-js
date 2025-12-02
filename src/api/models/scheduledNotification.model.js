@@ -46,8 +46,8 @@ scheduledNotificationSchema.statics = {
         notification: item.notification,
         send_total: item.send_total,
         schedule: item.schedule,
-		    status: item.status == true ? 'Active' : 'Inactive',
-        send_total: (item.send_total) ? `success count : ${item.send_total.success_count}<br/>failed count : ${item.send_total.failed_count}` : 'success count : 0<br/>failed count : 0',
+		    status: item.status,
+        send_total: item.send_total,
         createdAt: item.createdAt,
       });
     });
