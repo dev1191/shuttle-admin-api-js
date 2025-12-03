@@ -219,7 +219,7 @@ exports.remove = async (req, res, next) => {
                 await imageDelete(getSN.notification.picture,"notifications");
               }
             }
-            await ScheduledNotification.findByIdAndRemove(jobId);
+            await ScheduledNotification.findByIdAndDelete(jobId);
         }else{
 
             if(ScheduledNotification.exists({_id:jobId})){
@@ -229,7 +229,7 @@ exports.remove = async (req, res, next) => {
                 await imageDelete(getSN.notification.picture,"notifications");
               }
             }
-            await ScheduledNotification.findByIdAndRemove(jobId);
+            await ScheduledNotification.findByIdAndDelete(jobId);
         }
        
        
