@@ -93,10 +93,10 @@ app.use(async (req, res, next) => {
 	const getSetting = await Setting.getgeneral();
 	if (getSetting) {
 	  //app.locals.timezone = getSetting.general.timezone;
-	  global.DEFAULT_TIMEZONE = getSetting.timezone;
-	  global.DEFAULT_DATEFORMAT = getSetting.date_format.value ? getSetting.date_format.value : 'DD MMM YYYY'
-	  global.DEFAULT_TIMEFORMAT = getSetting.time_format.value ? getSetting.time_format.value : 'hh:mm A';
-          global.DEFAULT_CURRENCY = getSetting.default_currency;
+	  global.DEFAULT_TIMEZONE = getSetting.timezone ?? 'Asia/Kolkata';
+	  global.DEFAULT_DATEFORMAT = getSetting.date_format ?? 'DD MMM YYYY'
+	  global.DEFAULT_TIMEFORMAT = getSetting.time_format ?? 'hh:mm A';
+          global.DEFAULT_CURRENCY = getSetting.default_currency ?? 'INR';
 	}
 	next();
   });

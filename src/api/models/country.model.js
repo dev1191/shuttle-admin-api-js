@@ -62,7 +62,7 @@ countrySchema.statics = {
     const selectableItems = [];
     data.forEach((item) => {
         selectableItems.push({
-            text: `${item.name} (+${item.phone_code})`,
+            label: `${item.name} (+${item.phone_code})`,
             value:item.phone_code,
 
         });

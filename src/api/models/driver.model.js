@@ -77,7 +77,7 @@ const driverSchema = new mongoose.Schema(
     status: { type: Boolean, default: true, index: true },
     duty_status: {
       type: String,
-      enum: ["ONLINE", "TRACKING", "OFFLINE"],
+      enum: ["ONLINE", "TRACK", "OFFLINE"],
       default: "OFFLINE",
     },
   },

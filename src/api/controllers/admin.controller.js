@@ -4,6 +4,7 @@ const Admin = require("../models/admin.model");
 const Role = require("../models/role.model");
 const AdminDetail = require("../models/adminDetail.model");
 const slug = require("slug");
+const { v4: uuidv4 } = require("uuid");
 const Listeners = require("../events/Listener");
 const APIError = require("../utils/APIError");
 const emailProvider = require("../services/emails/emailProvider");
@@ -14,6 +15,7 @@ const {
   uploadLocal,
   deleteLocal,
 } = require("../services/uploaderService");
+const { handleImageUpload } = require("../utils/imageHandler");
 
 exports.lists = async (req, res, next) => {
   try {
@@ -289,6 +291,15 @@ exports.update = async (req, res, next) => {
       picture,
     } = req.body;
 
+        // ✅ Find existing admin first
+    const existingAdmin = await Admin.findById(adminId);
+    if (!existingAdmin) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        code: httpStatus.NOT_FOUND,
+        msg: "Admin not found",
+      });
+    }
+
     // Build update object for Admin (only include provided fields)
     const adminUpdate = {};
     if (typeof firstname !== "undefined") adminUpdate.firstname = firstname;
@@ -306,6 +317,21 @@ exports.update = async (req, res, next) => {
       const getRoleId = await Role.findOne({ slug: slug(role) }).lean();
       adminUpdate.roleId = getRoleId._id;
     }
+
+    
+    // ✅ Handle picture upload
+    if (req.files) {
+      console.log("req.files.picture", req.files.picture);
+       adminUpdate.picture = await handleImageUpload(
+        req.files.picture,
+        existingAdmin.picture, // use current picture as old image
+        process.env.S3_BUCKET_USERPRO,
+        { resize: true, width: 60, height: 60, filenamePrefix: "profile" }
+      );
+    }else{
+    adminUpdate.picture = picture;
+    }
+
     // Update Admin
     const updatedAdmin = await Admin.findByIdAndUpdate(
       new mongoose.Types.ObjectId(adminId),

@@ -5,35 +5,32 @@ const APIError = require("../utils/APIError");
 
 exports.fetchLanguage = async (req, res, next) => {
   try {
-    /**  const condition = (req.query.name != '') ? {
-      $match:{
-        name: { $regex: `(\s+${req.query.name}|^${req.query.name})`, $options: "i" },
-        status:true
-      }
-    } : {
-       $match :{
-        status:true
-       }
-    };  **/
+    let condition = req.query.search != ""
+        ? {
+            label: {
+              $regex: `(\s+${req.query.search}|^${req.query.search})`,
+              $options: "i",
+            },
+            status: true,
+          }
+        : {
+            status: true,
+          };
 
-    const getCountries = await Language.aggregate([
-      {
-        $match: {
-          status: true,
-        },
-      },
+    const getLanguages = await Language.aggregate([
+      { $match: condition },
       {
         $project: {
           _id: 0,
-          text: { $concat: ["$name", " ", "$symbol"] },
-          value: "$symbol",
+          label: { $concat: ["$label", "(", "$code", ")"] },
+          value: "$code",
         },
       },
       {
-        $sort: { text: -1 },
+        $sort: { label: -1 },
       },
     ]);
-    res.json({ data: getCountries });
+    res.json({ items: getLanguages });
   } catch (error) {
     console.log(error);
     throw new APIError(error);
@@ -219,7 +216,7 @@ exports.list = async (req, res, next) => {
         totalDocs: "totalRecords",
         docs: "items",
       },
-       populate: [{ path: "countryId", select: 'name' }],
+      populate: [{ path: "countryId", select: "name" }],
       sort,
     };
 

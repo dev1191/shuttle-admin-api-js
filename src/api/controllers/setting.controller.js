@@ -302,7 +302,7 @@ exports.update = async (req, res, next) => {
 
     //const existingAdmin = await Setting.findOne({}, { [type]: 1 }).lean();
 
-
+    console.log("data",data)
     const updated = await Setting.findOneAndUpdate(
       {}, // update the first (and usually only) settings document
       { [type]: data }, // dynamically set the field (e.g. { general: {...} })

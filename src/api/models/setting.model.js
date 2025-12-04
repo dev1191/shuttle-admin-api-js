@@ -22,16 +22,32 @@ const settingSchema = new mongoose.Schema(
   {
     general: {
       name: { type: String, index: true },
-      logo: { type: String, default: "public/images/nologo.png", index: true }, //public/images/nologo.png
+      tagline: { type: String, index: true },
+      dark_logo: {
+        type: String,
+        default: "public/images/nologo.png",
+        index: true,
+      }, //public/images/nologo.png
+      light_logo: {
+        type: String,
+        default: "public/images/nologo.png",
+        index: true,
+      }, //public/images/nologo.png
+      favicon: {
+        type: String,
+        default: "public/images/nologo.png",
+        index: true,
+      }, //public/images/nologo.png
       email: { type: String, default: "", index: true },
       address: { type: String, default: "", index: true },
       phone: { type: String, default: "", index: true },
       google_key: { type: String, default: "", index: true },
       timezone: { type: String, default: "Asia/Kolkata" },
-      date_format: { type: Object, default: {}, index: true },
-      time_format: { type: Object, default: {}, index: true },
+      date_format: { type: String, default: "DD MMM YYYY", index: true },
+      time_format: { type: String, default: "hh:mm A", index: true },
       default_country: { type: String, index: true },
       default_currency: { type: String, index: true },
+      default_language: { type: String, index: true },
       tax: { type: String, default: "0" },
       fee: { type: String, default: "0" },
       api_base_url: { type: String, default: "" },
@@ -72,6 +88,7 @@ const settingSchema = new mongoose.Schema(
         secret_key: { type: String, default: "", index: true },
         region: { type: String, default: "", index: true },
         bucket: { type: String, default: "", index: true },
+        endpoint: { type: String, default: "", index: true },
       },
       cloudinary: {
         cloud_name: { type: String, default: "" },
@@ -210,7 +227,7 @@ settingSchema.statics = {
         bucket: data.s3.bucket,
       };
     }
-    if( type == "storage") {
+    if (type == "storage") {
       return {
         id: data._id,
         name: data.storage.name,
@@ -219,6 +236,7 @@ settingSchema.statics = {
           secret_key: data.storage.spaces.secret_key,
           region: data.storage.spaces.region,
           bucket: data.storage.spaces.bucket,
+          endpoint: data.storage.spaces.endpoint,
         },
         cloudinary: {
           cloud_name: data.storage.cloudinary.cloud_name,
@@ -305,6 +323,10 @@ settingSchema.statics = {
   async gets3() {
     const gets3 = await this.findOne({}, "s3").lean();
     return gets3.s3;
+  },
+  async getStorage() {
+    const getStorage = await this.findOne({}, "storage").lean();
+    return getStorage.storage;
   },
   isValidURL(str) {
     const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;

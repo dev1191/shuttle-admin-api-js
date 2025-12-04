@@ -6,35 +6,32 @@ const APIError = require("../utils/APIError");
 
 exports.fetchCurrency = async (req, res, next) => {
   try {
-    /**  const condition = (req.query.name != '') ? {
-      $match:{
-        name: { $regex: `(\s+${req.query.name}|^${req.query.name})`, $options: "i" },
-        status:true
-      }
-    } : {
-       $match :{
-        status:true
-       }
-    };  **/
+    let condition = req.query.search != ""
+        ? {
+            name: {
+              $regex: `(\s+${req.query.search}|^${req.query.search})`,
+              $options: "i",
+            },
+            status: true,
+          }
+        : {
+            status: true,
+          };
 
-    const getCountries = await Currency.aggregate([
-      {
-        $match: {
-          status: true,
-        },
-      },
+    const getCurrencies = await Currency.aggregate([
+      { $match: condition },
       {
         $project: {
           _id: 0,
-          text: { $concat: ["$name", " ", "$symbol"] },
+          label: { $concat: ["$name", " ", "$symbol"] },
           value: "$symbol",
         },
       },
       {
-        $sort: { text: -1 },
+        $sort: { label: -1 },
       },
     ]);
-    res.json({ data: getCountries });
+    res.json({ items: getCurrencies });
   } catch (error) {
     console.log(error);
     throw new APIError(error);
@@ -203,10 +200,9 @@ exports.list = async (req, res, next) => {
         };
 
     let sort = {};
-    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
       sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
-    } 
-
+    }
 
     const paginationoptions = {
       page: req.query.page || 1,
