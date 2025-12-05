@@ -10,7 +10,7 @@ const router = express.Router();
 
 
 router
-  .route('/search')
+  .route('/')
   .get(getAuth('booking.view', 'master.admin'), controller.list);
 
 

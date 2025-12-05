@@ -115,7 +115,7 @@ exports.list = async (req, res, next) => {
           is_deleted: false,
         }
       : {
-          travel_status: req.query.travel_status,
+          travel_status: req.query.travel_status.toUpperCase(),
           is_deleted: false,
         };
 
@@ -421,14 +421,14 @@ exports.list = async (req, res, next) => {
       collation: { locale: "en" },
       customLabels: {
         totalDocs: "totalRecords",
-        docs: "bookings",
+        docs: "items",
       },
       sort,
     };
 
     const result = await Booking.aggregatePaginate(aggregateQuery, options);
 
-    res.json({ data: result });
+    res.json(result );
   } catch (error) {
     console.log(error);
     next(error);
