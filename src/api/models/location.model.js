@@ -16,6 +16,7 @@ const locationSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    landmark:{ type: String, default: "",index:true },
     integer_id:{type:Number,default:1,unique:true},
     type: { type: String, default: "" },
     location: {
@@ -23,10 +24,8 @@ const locationSchema = new mongoose.Schema(
       address: { type: String, default: "" },
       coordinates: [Number, Number],
     },
-    city: { type: String, default: "" },
-    state: { type: String, default: "" },
     status: { type: Boolean, default: false },
-    pictures:{type:[String],default:null}
+    files:{type:[String],default:null}
   },
   {
     timestamps: true,
@@ -44,9 +43,8 @@ locationSchema.method({
     const fields = [
       "id",
       "title",
+      "landmark",
       "location",
-      "city",
-      "state",
       "status",
       "createdAt",
       "updatedAt",
@@ -110,6 +108,7 @@ locationSchema.statics = {
       id: item._id,
       integer_id:item.integer_id,
       title: item.title,
+      landmark: item.landmark,
       type: item.type,
       address: item.location.address,
       lat: item.location.coordinates[1],
@@ -124,6 +123,7 @@ locationSchema.statics = {
         id: item._id,
         pageid: objectIdToTimestamp(item._id),
         title: item.title,
+        landmark: item.landmark,
         address:item.location.address,
         coordinates:item.location.coordinates
       });
@@ -139,11 +139,12 @@ locationSchema.statics = {
         ids: item.id,
         integer_id:item.integer_id,
         title: item.title,
+        landmark: item.landmark,
         type: item.type,
         location_address: item.location.address,
         location_lat: item.location.coordinates[1],
         location_lng: item.location.coordinates[0],
-        status: item.status == true ? "Active" : "Inactive",
+        status: item.status,
         createdAt: item.createdAt,
       });
     });

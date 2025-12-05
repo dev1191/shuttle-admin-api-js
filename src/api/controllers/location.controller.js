@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const { omit } = require("lodash");
 const Location = require("../models/location.model");
 const { imageDelete, imageUpload } = require("../services/uploaderService");
+const { handleImageUpload } = require("../utils/imageHandler");
 
 const Route = require("../models/route.model");
 const RouteStop = require("../models/routeStop.model");
@@ -78,7 +79,7 @@ exports.get = async (req, res) => {
  */
 exports.create = async (req, res, next) => {
   try {
-    const { title, address, lat, lng, city, state, status, type, files } = req.body;
+    const { title, landmark, lat, lng, status, type } = req.body;
     const FolderName = process.env.S3_BUCKET_LOCATION;
     let lastIntegerId = 1;
     const lastRoute = await Location.findOne({}).sort({ 'integer_id': -1 });
@@ -89,29 +90,34 @@ exports.create = async (req, res, next) => {
 
    const locationObject = {
       title,
+      landmark,
       location: {
         type: "Point",
-        address,
         coordinates: [parseFloat(lng), parseFloat(lat)],
       },
-      city,
-      state,
       type,
       status,
 	  integer_id:lastIntegerId
     };
+    // Accept multipart uploads (req.files.files), single file (req.files.file), or base64 array in req.body.files
     let pictures = [];
-    if (files && files.length > 0) {
-      files.forEach(async (file) => {
-        const s3Dataurl = await imageUpload(
-          file.path,
-          `${uuidv4()}`,
-          FolderName
-        );
-        pictures.push(s3Dataurl);
-      });
+    const incoming = (req.files && (req.files.files || req.files.file || req.files.picture)) || req.body.files || null;
+    const fileArray = [];
+    if (Array.isArray(incoming)) {
+      fileArray.push(...incoming);
+    } else if (incoming) {
+      fileArray.push(incoming);
     }
-    locationObject.pictures = pictures;
+
+    if (fileArray.length > 0) {
+      const uploaded = await Promise.all(
+        fileArray.map((f) => handleImageUpload(f, null, FolderName, { resize: false })
+        )
+      );
+      pictures = uploaded.filter(Boolean);
+    }
+
+    locationObject.files = pictures;
 
     const location = await new Location(locationObject).save();
     res.status(httpStatus.CREATED);
@@ -131,30 +137,34 @@ exports.create = async (req, res, next) => {
  */
 exports.update = async (req, res, next) => {
   try {
-    const { title, address, lat, lng, city, state, status, type, files } = req.body;
+    const { title, landmark, lat, lng, status, type, files } = req.body;
     const FolderName = process.env.S3_BUCKET_LOCATION;
     const updateObj = {
       title: title,
+              landmark: landmark,
       location: {
         type: "Point",
-        address: address,
+
         coordinates: [parseFloat(lng), parseFloat(lat)],
       },
-      city: city,
-      state:state,
       type: type,
       status: status == "1",
     }
     let pictures = [];
-    if (files && files.length > 0) {
-      files.forEach(async (file) => {
-        const s3Dataurl = await imageUpload(
-          file.path,
-          `${uuidv4()}`,
-          FolderName
-        );
-        pictures.push(s3Dataurl);
-      });
+    // Support files from multipart (req.files) or JSON body (files array of base64/paths)
+    const incoming = (req.files && (req.files.files || req.files.file || req.files.picture)) || req.body.files || null;
+    const fileArray = [];
+    if (Array.isArray(incoming)) {
+      fileArray.push(...incoming);
+    } else if (incoming) {
+      fileArray.push(incoming);
+    }
+
+    if (fileArray.length > 0) {
+      const uploaded = await Promise.all(
+        fileArray.map((f) => handleImageUpload(f, null, FolderName, { resize: false }))
+      );
+      pictures = uploaded.filter(Boolean);
     }
     updateObj.pictures = pictures;
 
@@ -200,26 +210,25 @@ exports.list = async (req, res, next) => {
                 $options: "i",
               },
             },
-			{
-              integer_id: parseInt(req.query.search)
-            }
-            // { type: req.query.search },
+            {
+              landmark: {
+                $regex:
+                  "(s+"
+                  + req.query.search
+                  + "|^"
+                  + req.query.search
+                  + ")",
+                $options: "i",
+              },
+            },
           ],
         }
       : {};
 
     let sort = {};
-    if (!req.query.sort) {
-      sort = { _id: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = { [data.name]: data.order != "none" ? data.order : "asc" };
-    }
-
-    if (req.query.filters) {
-      const filtersData = JSON.parse(req.query.filters);
-      condition = { [filtersData.name]: filtersData.selected_options[0] };
-    }
+    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
+    } 
 
     const paginationoptions = {
       page: req.query.page || 1,
@@ -227,15 +236,15 @@ exports.list = async (req, res, next) => {
       collation: { locale: "en" },
       customLabels: {
         totalDocs: "totalRecords",
-        docs: "locations",
+        docs: "items",
       },
       sort,
       lean: true,
     };
 
     const result = await Location.paginate(condition, paginationoptions);
-    result.locations = Location.transformDataLists(result.locations);
-    res.json({ data: result });
+    result.items = Location.transformDataLists(result.items);
+    res.json(result);
   } catch (error) {
 	  console.log("error: ",error);
     next(error);

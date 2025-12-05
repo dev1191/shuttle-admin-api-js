@@ -319,17 +319,35 @@ exports.update = async (req, res, next) => {
     }
 
     
-    // ✅ Handle picture upload
+    // ✅ Handle picture upload (support single file or array of files)
     if (req.files) {
-      console.log("req.files.picture", req.files.picture);
-       adminUpdate.picture = await handleImageUpload(
-        req.files.picture,
-        existingAdmin.picture, // use current picture as old image
-        process.env.S3_BUCKET_USERPRO,
-        { resize: true, width: 60, height: 60, filenamePrefix: "profile" }
-      );
-    }else{
-    adminUpdate.picture = picture;
+      const incoming = req.files.picture || req.files.files || null;
+      const filesArr = [];
+      if (Array.isArray(incoming)) {
+        filesArr.push(...incoming);
+      } else if (incoming) {
+        filesArr.push(incoming);
+      }
+
+      if (filesArr.length > 0) {
+        const uploaded = await Promise.all(
+          filesArr.map((f) =>
+            handleImageUpload(
+              f,
+              existingAdmin.picture,
+              process.env.S3_BUCKET_USERPRO,
+              { resize: true, width: 60, height: 60, filenamePrefix: "profile" }
+            )
+          )
+        );
+        // set primary picture to first uploaded and keep list on pictures
+        adminUpdate.picture = uploaded[0];
+        if (uploaded.length > 1) adminUpdate.pictures = uploaded;
+      } else {
+        adminUpdate.picture = picture;
+      }
+    } else {
+      adminUpdate.picture = picture;
     }
 
     // Update Admin

@@ -199,14 +199,10 @@ exports.list = async (req, res, next) => {
         };
 
     let sort = {};
-    if (!req.query.sort) {
-      sort = { _id: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = {
-        [data.name]: data.order != "none" ? data.order : "asc",
-      };
-    }
+    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
+    } 
+
 
     const paginationoptions = {
       page: req.query.page || 1,

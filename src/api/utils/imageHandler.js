@@ -34,7 +34,8 @@ const { imageDelete, imageUpload, resizeUpload, uploadLocal, uploadCloudinary, d
   if (isValidURL(existingPicture)) {
     switch (storageConfig.name) {
       case "cloudinary":
-        await deleteCloudinary(storageConfig, existingPicture);
+        // pass the inner cloudinary config object to the delete helper
+        await deleteCloudinary(storageConfig.cloudinary || {}, existingPicture);
         break;
       default:
         await imageDelete(existingPicture, storageConfig.bucket || "");
@@ -88,10 +89,23 @@ const { imageDelete, imageUpload, resizeUpload, uploadLocal, uploadCloudinary, d
     }
 
     case "cloudinary": {
+      // Validate cloudinary configuration before attempting upload
+      const cfg = storageConfig.cloudinary || {};
+      const hasCreds = (cfg.api_key && cfg.api_key.length) || process.env.CLOUDINARY_KEY;
+      if (!cfg.cloud_name && !process.env.CLOUDINARY_NAME) {
+        throw new Error('Cloudinary is not configured: missing cloud_name');
+      }
+      if (!hasCreds) {
+        throw new Error('Cloudinary is not configured: missing api_key or CLOUDINARY_KEY');
+      }
+      if (!(cfg.api_secret && cfg.api_secret.length) && !process.env.CLOUDINARY_SECRET) {
+        throw new Error('Cloudinary is not configured: missing api_secret or CLOUDINARY_SECRET');
+      }
+
       // Cloudinary uploader accepts base64 or file object
-      if (base64String) return await uploadCloudinary(storageConfig, base64String, folderName, height, width, quality);
-      if (buffer) return await uploadCloudinary(storageConfig, buffer, folderName, height, width, quality);
-      return await uploadCloudinary(storageConfig, newFile, folderName, height, width, quality);
+      if (base64String) return await uploadCloudinary(cfg, base64String, folderName, height, width, quality);
+      if (buffer) return await uploadCloudinary(cfg, buffer, folderName, height, width, quality);
+      return await uploadCloudinary(cfg, newFile, folderName, height, width, quality);
     }
 
     case "local":

@@ -4,15 +4,15 @@ const {
   DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-const { s3Client } = require("../../config/s3Client");
 const BUCKET_NAME = process.env.AWS_S3_BUCKET;
 const CDNURL = process.env.CDN_URL;
 const path = require("path");
 const fs = require("fs").promises;
 const sharp = require("sharp");
-const  { v4: uuidv4 }  = require("uuid");
+const { v4: uuidv4 } = require("uuid");
 const url = require("url");
-
+const { v2: cloudinary } = require("cloudinary");
+const { s3Client } = require("../../config/s3Client");
 /**
  *
  * @param  {string}  base64 Data
@@ -130,8 +130,7 @@ module.exports = {
     try {
       let key = "";
       let bucketParams = {};
-      const regex =
-        /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
+      const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
       if (!regex.test(imageName)) {
         key = imageName;
         bucketParams = {
@@ -155,7 +154,8 @@ module.exports = {
       return deleteObject;
     } catch (err) {
       console.log("errr12", err);
-      return err;
+      // Throw error so callers can handle it explicitly (avoid returning error objects as successful results)
+      throw err;
     }
   },
   resizeUpload: async (isProfile, base64Data, width, height) => {
@@ -174,6 +174,77 @@ module.exports = {
     } catch (err) {
       console.log("errr12", err);
       return err;
+    }
+  },
+  uploadCloudinary: async (
+    config,
+    FileData,
+    folder,
+    height,
+    width,
+    quality
+  ) => {
+    try {
+      cloudinary.config({
+        cloud_name: config.cloud_name
+          ? config.cloud_name
+          : process.env.CLOUDINARY_NAME,
+        api_key: config.api_key ? config.api_key : process.env.CLOUDINARY_KEY,
+        api_secret: config.api_secret
+          ? config.api_secret
+          : process.env.CLOUDINARY_SECRET,
+      });
+
+      const options = { folder };
+      if (height && width) {
+        options.height = height;
+        options.width = width;
+      }
+      if (quality) {
+        options.quality = quality;
+      }
+      options.resource_type = "image";
+      options.crop = "fill";
+
+      const result = await cloudinary.uploader.upload(FileData, options);
+      return result.url;
+    } catch (err) {
+      console.log("errr12", err);
+      return err;
+    }
+  },
+  deleteCloudinary: async (config, fileURL, folderName) => {
+    try {
+      cloudinary.config({
+        cloud_name: config.cloud_name
+          ? config.cloud_name
+          : process.env.CLOUDINARY_NAME,
+        api_key: config.api_key ? config.api_key : process.env.CLOUDINARY_KEY,
+        api_secret: config.api_secret
+          ? config.api_secret
+          : process.env.CLOUDINARY_SECRET,
+      });
+
+      // Extract the last part of the URL
+      const imageNameWithExtension = fileURL.substring(
+        fileURL.lastIndexOf("/") + 1
+      );
+
+      // Extract the image name without the extension
+      const imageName = imageNameWithExtension
+        .split(".")
+        .slice(0, -1)
+        .join(".");
+
+      const result = await cloudinary.uploader.destroy(
+        folderName + "/" + imageName
+      );
+      console.log("result", result, "imageName", imageName);
+      return "";
+    } catch (err) {
+      console.log("errr12", err);
+      // Throw to let callers handle deletion failures explicitly
+      throw err;
     }
   },
 };

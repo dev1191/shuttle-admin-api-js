@@ -36,6 +36,7 @@ const paymentgatewayRoutes = require('./paymentgateway.route');
 const MapRoutes = require('./map.route');
 const busScheduleRoutes = require('./busschedule.route');
 const pageRoutes = require('./page.route');
+const uploaderRoutes = require('./uploader.route');
 const router = express.Router();
 
 /**
@@ -53,7 +54,7 @@ router.use('/users', userRoutes);
 router.use('/auth', authRoutes);
 router.use('/roles', roleRoutes);
 router.use('/resources', resourceRoutes);
-router.use('/locations', locationRoutes);
+router.use('/stops', locationRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/operator', agentRoutes);
 router.use('/buses', busRoutes);
@@ -82,7 +83,8 @@ router.use('/notifications', notificationRoutes);
 router.use('/permissions', permissionRoutes);
 router.use('/payment-gateways', paymentgatewayRoutes);
 router.use('/maps', MapRoutes);
-router.use('/bus-schedules',busScheduleRoutes);
+router.use('/bus-schedules', busScheduleRoutes);
 router.use('/pages', pageRoutes);
+router.use('/uploader', uploaderRoutes);
 
 module.exports = router;

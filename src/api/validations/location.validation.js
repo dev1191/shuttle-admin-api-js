@@ -1,28 +1,26 @@
-const Joi = require('joi');
-const { objectId } = require('./custom.validation');
-
+const Joi = require("joi");
+const { objectId } = require("./custom.validation");
 
 const listLocations = {
-  query: Joi.object().keys({
-    search: Joi.string().allow(null, ''),
-    page: Joi.number().min(1),
-    limit: Joi.number().min(1).max(100),
-    firstname: Joi.string(),
-    lastname: Joi.string(),
-    phone: Joi.string(),
-    email: Joi.string(),
-    status: Joi.boolean(),
-  }).unknown(),
+  query: Joi.object()
+    .keys({
+      search: Joi.string().allow(null, ""),
+      page: Joi.number().min(1),
+      limit: Joi.number().min(1).max(100),
+      status: Joi.boolean(),
+    })
+    .unknown(),
 };
 
 const createLocation = {
   body: Joi.object().keys({
     title: Joi.string().required(),
-    location: Joi.object(),
-    city: Joi.string(),
-    state: Joi.string(),
-    satus: Joi.number(),
-  }).unknown(),
+    lat: Joi.number(),
+    lng: Joi.number(),
+    landmark: Joi.string(),
+    type: Joi.optional(),
+    status: Joi.boolean(),
+  }),
 };
 
 const replaceLocation = {
@@ -31,11 +29,12 @@ const replaceLocation = {
   }),
   body: Joi.object()
     .keys({
-      title: Joi.string(),
-      location: Joi.object(),
-      city: Joi.string(),
-      state: Joi.string(),
-      satus: Joi.number(),
+      title: Joi.string().required(),
+      lat: Joi.number(),
+      type: Joi.optional(),
+      lng: Joi.number(),
+      landmark: Joi.string(),
+      status: Joi.boolean(),
     })
     .min(1),
 };
@@ -47,10 +46,11 @@ const updateLocation = {
   body: Joi.object()
     .keys({
       title: Joi.string().required(),
-      location: Joi.object(),
-      city: Joi.string(),
-      state: Joi.string(),
-      satus: Joi.number(),
+      lat: Joi.number(),
+      type: Joi.optional(),
+      lng: Joi.number(),
+      landmark: Joi.string(),
+      status: Joi.boolean(),
     })
     .unknown()
     .min(1),
@@ -62,9 +62,7 @@ const deleteLocation = {
   }),
 };
 
-
 module.exports = {
-
   // GET /v1/locations
   listLocations,
   // POST /v1/locations
