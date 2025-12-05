@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const Validate = require('../../middlewares/validator');
 const controller = require('../../controllers/route.controller');
 const { getAuth } = require('../../middlewares/auth');
@@ -7,7 +8,6 @@ const {
   createRoute,
   updateRoute,
 } = require('../../validations/route.validation');
-const multer = require('multer');
 
 const upload = multer({});
 
@@ -25,7 +25,8 @@ router
 
 router
   .route('/')
-  .get(controller.load)
+
+  .get(getAuth('route.view', 'master.admin'), Validate(listRoute), controller.list)
 
   .post(getAuth('route.create', 'master.admin'), Validate(createRoute), controller.create);
 
@@ -35,9 +36,8 @@ router
 
 
 router
-  .route('/search')
-  .get(getAuth('route.view', 'master.admin'), Validate(listRoute), controller.list);
-
+  .route('/load')
+  .get(controller.load)
 router
   .route('/find/:search')
   .get(getAuth('route.view', 'master.admin'), controller.search);

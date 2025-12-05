@@ -56,6 +56,17 @@ const updateLocation = {
     .min(1),
 };
 
+const updateLocationStatus = {
+  params: Joi.object().keys({
+    locationId: Joi.required().custom(objectId),
+  }),
+  body: Joi.object()
+    .keys({
+      status: Joi.boolean().required(),
+    })
+};
+
+
 const deleteLocation = {
   params: Joi.object().keys({
     locationId: Joi.string().custom(objectId),
@@ -71,5 +82,6 @@ module.exports = {
   replaceLocation,
   // PATCH /v1/locations/:locationId
   updateLocation,
+  updateLocationStatus,
   deleteLocation,
 };

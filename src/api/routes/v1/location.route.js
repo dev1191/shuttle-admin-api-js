@@ -34,11 +34,15 @@ router
   /**
   * update the single location
   * */
-  .patch(getAuth('stop.edit', 'master.admin'), Validate(locationValidation.updateLocation), controller.update)
+  .put(getAuth('stop.edit', 'master.admin'), Validate(locationValidation.updateLocation), controller.update)
 /**
   * delete  the single location
   * */
 
   .delete(getAuth('stop.delete', 'master.admin'), Validate(locationValidation.deleteLocation), controller.remove);
 
+  
+router
+  .route('/:locationId/status')
+  .patch(getAuth('stop.edit', 'master.admin'), Validate(locationValidation.updateLocationStatus), controller.status);
 module.exports = router;

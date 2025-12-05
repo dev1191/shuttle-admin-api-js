@@ -114,6 +114,7 @@ locationSchema.statics = {
       lat: item.location.coordinates[1],
       lng: item.location.coordinates[0],
       status: item.status,
+      files:item.files ?? [],
     };
   },
   formatLocation(data) {

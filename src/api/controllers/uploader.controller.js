@@ -164,7 +164,7 @@ exports.update = async (req, res, next) => {
  */
 exports.delete = async (req, res, next) => {
   try {
-    const { fileUrl, fileId } = req.body;
+    const { url } = req.body;
 
     if (!fileUrl && !fileId) {
       return res.status(httpStatus.BAD_REQUEST).json({

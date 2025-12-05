@@ -247,9 +247,10 @@ exports.get = async (req, res) => {
               as: "stop",
               in: {
                 id: "$$stop._id",
-				routeId: "$$stop.routeId",
                 stopId: "$$stop.stopId",
-                location: "$$stop.location",
+                stop_name: "$$stop.location.title",
+                address: "$$stop.location.address",
+                coordinates: "$$stop.location.coordinates",
                 order: "$$stop.order",
                 minimum_fare_pickup: "$$stop.minimum_fare_pickup",
                 minimum_fare_drop: "$$stop.minimum_fare_drop",
@@ -266,11 +267,7 @@ exports.get = async (req, res) => {
       },
     ]);
     res.status(httpStatus.OK);
-    res.json({
-      message: "Single route successfully.",
-      data: route[0], //Route.transFormSingleData(route),
-      status: true,
-    });
+    res.json(route[0]);
   } catch (error) {
     console.log(error);
     return error;
@@ -375,18 +372,20 @@ exports.update = async (req, res, next) => {
 exports.status = async (req, res, next) => {
   try {
     const { status } = req.body;
+
     const update = await Route.updateOne(
       { _id: req.params.routeId },
-      { status: status == "Active" ? "true" : "false" }
+      { status: status === "Active" ? "true" : "false" }
     );
-    if (update.n > 0) {
+
+    if (update.matchedCount > 0) {
       res.json({
         message: `status now is ${status}.`,
         status: true,
       });
     } else {
       res.json({
-        message: `updated failed.`,
+        message: `update failed.`,
         status: false,
       });
     }
@@ -461,13 +460,7 @@ exports.list = async (req, res, next) => {
 		  integer_id: 1,
           title: 1,
           total_stops: 1,
-          status: {
-            $cond: {
-              if: { $eq: ["$status", true] },
-              then: "Active",
-              else: "InActive",
-            },
-          },
+          status: 1,
           createdAt: 1,
         },
       },
@@ -482,14 +475,14 @@ exports.list = async (req, res, next) => {
       collation: { locale: "en" },
       customLabels: {
         totalDocs: "totalRecords",
-        docs: "routes",
+        docs: "items",
       },
       sort,
     };
 
     const result = await Route.aggregatePaginate(aggregateQuery, options);
 
-    res.json({ data: result });
+    res.json(result);
 	  } catch (error) {
     next(error);
   }
