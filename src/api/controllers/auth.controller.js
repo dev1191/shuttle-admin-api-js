@@ -9,6 +9,7 @@ const Role = require("../models/role.model");
 const AdminDetail = require("../models/adminDetail.model");
 const AdminRole = require("../models/adminRole.model");
 const Language = require("../models/language.model");
+const Currency = require("../models/currency.model");
 const Setting = require("../models/setting.model");
 const RefreshToken = require("../models/refreshToken.model");
 const PasswordResetToken = require("../models/passwordResetToken.model");
@@ -114,6 +115,7 @@ exports.access = async (req, res, next) => {
     const getPermissions = await Role.getPermission(roleId);
     const getRoles = await Role.getRoles();
     const generalSettings = await Setting.getgeneral();
+    generalSettings.currency_symbol = await Currency.findOne({code: generalSettings.default_currency}).lean().then(c => c.symbol);
     const getLanguages = await Language.find({ status: true })
       .select("label code")
       .lean();

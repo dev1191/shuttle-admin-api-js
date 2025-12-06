@@ -94,7 +94,7 @@ exports.list = async (req, res, next) => {
       ? {
           $or: [
             {
-              fullname: {
+              pnr_no: {
                 $regex: new RegExp(req.query.search),
                 $options: "i",
               },
@@ -120,33 +120,26 @@ exports.list = async (req, res, next) => {
         };
 
     let sort = {};
-    if (req.query.sortBy != "" && req.query.sortType != "") {
-      sort = { [req.query.sortBy]: req.query.sortType == "asc" ? 1 : -1 };
-    } else {
-      sort = { createdAt: -1 };
-    }
-    let filters = {};
-    if (req.query.filters) {
-      const filtersData = JSON.parse(req.query.filters);
+    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
+    } 
 
-      if (filtersData.type === "select") {
-        console.log("name", filtersData.name, filtersData.selected_options[0]);
-        filters = {
-          travel_status: req.query.travel_status,
-          is_deleted: false,
-        };
-      } else if (filtersData.type === "date") {
-        const today = moment(filtersData.value.startDate);
-        filters = {
-          booking_date: {
-            $gte: today.toDate(),
-            $lte: today.endOf("day").toDate(),
-          },
-          travel_status: req.query.travel_status,
-          is_deleted: false,
-        };
-      }
+
+    let newquery = {};
+    if (req.query.createdAt) {
+      const date = new Date(req.query.createdAt[0]);
+      const nextDate = new Date(req.query.createdAt[1]);
+      newquery.createdAt = {
+        $gte: date,
+        $lt: nextDate,
+      };
+      newquery.is_deleted = false;
+    } else if (req.query.status) {
+      newquery.status = req.query.status ? true: false;
+      newquery.is_deleted = false;
     }
+    condition = { ...condition, ...newquery };
+
 
     const aggregateQuery = Booking.aggregate([
       {
@@ -364,9 +357,9 @@ exports.list = async (req, res, next) => {
           customer_name: {
             $ifNull: [{ $concat: ["$user.firstname", "$user.lastname"] }, ""],
           },
+          customer_avatar: { $ifNull: ["$user.ProfilePic", ""] },
           customer_phone: { $ifNull: ["$user.phone", ""] },
           customer_email: { $ifNull: ["$user.email", ""] },
-          customer_gender: { $ifNull: ["$user.gender", ""] },
           userId: { $ifNull: ["$user._id", ""] },
           payment_status: { $ifNull: ["$payment.payment_status", ""] },
           payment_created: {
@@ -410,9 +403,6 @@ exports.list = async (req, res, next) => {
       {
         $match: condition,
       },
-      {
-        $match: filters,
-      },
     ]);
 
     const options = {
@@ -428,7 +418,7 @@ exports.list = async (req, res, next) => {
 
     const result = await Booking.aggregatePaginate(aggregateQuery, options);
 
-    res.json(result );
+    res.json(result);
   } catch (error) {
     console.log(error);
     next(error);

@@ -258,20 +258,8 @@ exports.list = async (req, res, next) => {
           code: 1,
           discount: 1,
           attempt: 1,
-          start_date: {
-            $dateToString: {
-              timezone: DEFAULT_TIMEZONE,
-              format: "%d-%m-%Y", // specify your desired date format
-              date: "$start_date", // replace with the actual date field you want to format
-            },
-          }, // moment.utc(item.start_date).format('MMM DD, YYYY'),
-          end_date: {
-            $dateToString: {
-              timezone: DEFAULT_TIMEZONE,
-              format: "%d-%m-%Y", // specify your desired date format
-              date: "$end_date", // replace with the actual date field you want to format
-            },
-          }, // moment.utc(item.end_date).format('MMM DD, YYYY'),
+          start_date: 1, // moment.utc(item.start_date).format('MMM DD, YYYY'),
+          end_date: 1 , // moment.utc(item.end_date).format('MMM DD, YYYY'),
           type: {
             $cond: {
               if: { $eq: ["$type", true] },
