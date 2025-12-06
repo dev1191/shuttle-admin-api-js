@@ -19,7 +19,7 @@ router
 
 
 router
-  .route('/markers')
+  .route('/load')
   .get(getAuth('stop.view', 'master.admin'), controller.load);
 
 

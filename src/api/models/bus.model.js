@@ -145,19 +145,9 @@ busSchema.statics = {
         const selectableItems = [];
         const i = 1;
         data.forEach((item) => {
-            // normalize status for display (handle legacy boolean and new enum)
-            let statusVal = item.status;
-            let statusLabel = 'Inactive';
-            if (typeof statusVal === 'boolean') {
-                statusLabel = statusVal ? 'Active' : 'Inactive';
-            } else if (statusVal) {
-                statusLabel = String(statusVal);
-                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
-            }
-
             selectableItems.push({
                 value: item._id,
-                text: item.name + ' - ' + item.buslayoutId.max_seats + ' seats'
+                label: item.name + ' - ' + item.buslayoutId.max_seats + ' seats'
             });
         });
         return selectableItems;

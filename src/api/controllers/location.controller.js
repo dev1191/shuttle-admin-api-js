@@ -36,14 +36,33 @@ exports.istitleExists = async (req, res, next) => {
 };
 
 exports.load = async (req, res) => {
-  try {
-    const location = await Location.find({}).sort({ _id: -1 });
-    res.status(httpStatus.OK);
-    res.json({
-      message: "stop load successfully.",
-      data: Location.transformLoad(location),
-      status: true,
-    });
+ try {
+    let condition = req.query.search != ""
+        ? {
+            title: {
+              $regex: `(\s+${req.query.search}|^${req.query.search})`,
+              $options: "i",
+            },
+            status: true,
+          }
+        : {
+            status: true,
+          };
+
+    const getLocations = await Location.aggregate([
+      { $match: condition },
+      {
+        $project: {
+          _id: 0,
+          label:"$title",
+          value: "$_id",
+        },
+      },
+      {
+        $sort: { label: -1 },
+      },
+    ]);
+    res.json({ items: getLocations });
   } catch (error) {
     console.log(error);
     return error;

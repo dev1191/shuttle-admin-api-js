@@ -26,64 +26,42 @@ const RouteStopSchema = new Schema(
 RouteStopSchema.index({ "stops.location": "2dsphere" });
 
 RouteStopSchema.statics = {
-  async updateRouteStop(dataObj, routeId) {
+  async updateRouteStop(dataObj, routeId, session) {
     try {
-      if (await this.exists({ routeId })) {
-        // if exists update route and if stop not found then create
-        dataObj.forEach(async (item) => {
-          const objUpdate = {
-            order: item.order,
-            duration_pickup: item.duration_pickup,
-            duration_drop: item.duration_drop,
-            minimum_fare_pickup: item.minimum_fare_pickup,
-            minimum_fare_drop: item.minimum_fare_drop,
-            price_per_km_pickup: item.price_per_km_pickup,
-            price_per_km_drop: item.price_per_km_drop,
-            departure_time: item.departure_time,
-            arrival_time: item.arrival_time,
-          };
-          if (item.id != "") {
-            objUpdate.routeId = routeId;
-            objUpdate.stopId = item.stopId;
-            await this.findByIdAndUpdate(item.id, objUpdate, { new: true });
-          } else {
-            objUpdate.routeId = routeId;
-            objUpdate.stopId = item.location.id;
+      const exists = await this.exists({ routeId }).session(session);
 
-            await this.findOneAndUpdate(
-              { routeId, stopId: objUpdate.stopId },
-              objUpdate,
-              { new: true, upsert: true }
-            );
-          }
-        });
-      } else {
-        // not found create new route stops
-        dataObj.forEach(async (item) => {
-          const objUpdate = {
-            order: item.order,
-            duration_pickup: item.duration_pickup,
-            duration_drop: item.duration_drop,
-            minimum_fare_pickup: item.minimum_fare_pickup,
-            minimum_fare_drop: item.minimum_fare_drop,
-            price_per_km_pickup: item.price_per_km_pickup,
-            price_per_km_drop: item.price_per_km_drop,
-            departure_time: item.departure_time,
-            arrival_time: item.arrival_time,
-          };
-          objUpdate.routeId = routeId;
-          objUpdate.stopId = item.location.id;
+      const ops = dataObj.map((item) => {
+        const obj = {
+          order: item.order,
+          minimum_fare_pickup: item.minimum_fare_pickup,
+          minimum_fare_drop: item.minimum_fare_drop,
+          price_per_km_pickup: item.price_per_km_pickup,
+          price_per_km_drop: item.price_per_km_drop,
+          routeId: routeId,
+          stopId: item.stopId,
+        };
 
-          await this.findOneAndUpdate(
-            { routeId, stopId: objUpdate.stopId },
-            objUpdate,
-            { new: true, upsert: true }
-          );
+        // Update existing record
+        if (exists && item.id) {
+          return this.findByIdAndUpdate(item.id, obj, {
+            new: true,
+            session,
+          });
+        }
+
+        // Insert or update (upsert)
+        return this.findOneAndUpdate({ routeId, stopId: obj.stopId }, obj, {
+          new: true,
+          upsert: true,
+          session,
         });
-      }
+      });
+
+      await Promise.all(ops);
+      return true;
     } catch (err) {
       console.log(err);
-      return err;
+      throw err;
     }
   },
   formatpickup(data) {

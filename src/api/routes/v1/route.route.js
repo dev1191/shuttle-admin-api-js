@@ -58,7 +58,7 @@ router
   .route('/:routeId')
 
   .get(getAuth('route.edit', 'master.admin'), controller.get)
-  .patch(getAuth('route.edit', 'master.admin'),Validate(updateRoute), controller.update)
+  .put(getAuth('route.edit', 'master.admin'),Validate(updateRoute), controller.update)
 /**
   * delete  the single location
   * */

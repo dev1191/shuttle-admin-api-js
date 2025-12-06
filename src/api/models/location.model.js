@@ -88,17 +88,9 @@ locationSchema.statics = {
     const selectableItems = [];
     rows.forEach((item) => {
       selectableItems.push({
-        id:item._id,
-        title: item.title,
-        address: item.location.address,
-        position: {
-          lat: item.location.coordinates[1],
-          lng: item.location.coordinates[0],
-        },
-        lat: item.location.coordinates[1],
-        lng: item.location.coordinates[0],
-        type: item.type,
-        status: item.status,
+        value:item._id,
+        label: item.title,
+
       });
     });
     return selectableItems;

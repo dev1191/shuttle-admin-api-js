@@ -8,8 +8,8 @@ const BusScheduleLocationSchema = new Schema(
   {
     busScheduleId: { type: ObjectId, ref: "Bus_Schedule", required: true },
     stopId: { type: ObjectId, ref: "Location", required: true },
-    departure_time: { type: Date, default: "", index: true },
-    arrival_time: { type: Date, default: "", index: true },
+    departure_time: { type: Number, default: "", index: true },
+    arrival_time: { type: Number, default: "", index: true },
     order: { type: Number, default: 1, index: true },
   },
   { timestamps: true }

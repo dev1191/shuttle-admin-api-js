@@ -2,14 +2,13 @@ const httpStatus = require("http-status");
 const { omit, isEmpty } = require("lodash");
 const base64Img = require("base64-img");
 const { VARIANT_ALSO_NEGOTIATES } = require("http-status");
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Route = require("../models/route.model");
 const RouteStop = require("../models/routeStop.model");
 const RouteDetail = require("../models/routeDetail.model");
 const BusSchedule = require("../models/busSchedule.model");
 const s3 = require("../../config/s3");
 const faker = require("../helpers/faker");
-
 
 exports.testData = (req, res) => {
   const d = faker.seedDrivers("123456");
@@ -34,7 +33,7 @@ exports.load = async (req, res) => {
 
 exports.loadStops = async (req, res) => {
   try {
-       const { routeId } = req.params;
+    const { routeId } = req.params;
     //const getRouteStops = await RouteStop.find({ routeId }).lean();
     const getRouteStops = await RouteStop.aggregate([
       {
@@ -61,13 +60,13 @@ exports.loadStops = async (req, res) => {
       {
         $unwind: "$location",
       },
-	  {
-        $sort:{ order:1}
+      {
+        $sort: { order: 1 },
       },
       {
         $project: {
           _id: 0,
-		  order:1,
+          order: 1,
           stopId: { $ifNull: ["$location.id", "-"] },
           location_title: { $ifNull: ["$location.title", "-"] },
           departure_time: "",
@@ -88,8 +87,6 @@ exports.loadStops = async (req, res) => {
   }
 };
 
-
-
 exports.loadData = async (req, res, next) => {
   try {
     const result = await Route.aggregate([
@@ -101,53 +98,53 @@ exports.loadData = async (req, res, next) => {
           from: "timetables", // Name of the timetable collection
           localField: "_id", // Field in the "routes" collection
           foreignField: "routeId", // Field in the "timetable" collection
-          as: "timetables" // New field to store matching timetables
-        }
+          as: "timetables", // New field to store matching timetables
+        },
       },
       {
         $match: {
-          timetables: { $ne: [] } // Only routes with timetables
-        }
+          timetables: { $ne: [] }, // Only routes with timetables
+        },
       },
       {
-        $sort:{ createdAt:-1}
+        $sort: { createdAt: -1 },
       },
       {
-        $project:{
-            _id:0,
-            value:"$_id",
-            text:"$title"  
-        }
+        $project: {
+          _id: 0,
+          value: "$_id",
+          text: "$title",
+        },
       },
     ]);
- 
-     res.json({ total_count: result.length, items: result });
+
+    res.json({ total_count: result.length, items: result });
   } catch (error) {
     next(error);
   }
 };
-
 
 exports.search = async (req, res, next) => {
   try {
     const { search } = req.params;
     const condition = search
       ? {
-        title: { $regex: `(\s+${search}|^${search})`, $options: 'i' },
-        status:true
-      }
-      : { status:true};
+          title: { $regex: `(\s+${search}|^${search})`, $options: "i" },
+          status: true,
+        }
+      : { status: true };
 
-      console.log("result",condition)
+    console.log("result", condition);
     const result = await Route.find(condition).lean();
- 
-    res.json({ total_count: result.length, items: await Route.transformOptions(result) });
+
+    res.json({
+      total_count: result.length,
+      items: await Route.transformOptions(result),
+    });
   } catch (error) {
     next(error);
   }
 };
-
-
 
 /**
  * Get route by locationId
@@ -184,7 +181,7 @@ exports.getLocationRoute = async (req, res) => {
  * @public
  */
 exports.get = async (req, res) => {
-   try {
+  try {
     const route = await Route.aggregate([
       {
         $lookup: {
@@ -201,7 +198,7 @@ exports.get = async (req, res) => {
                   {
                     $project: {
                       _id: 0,
-		      id:"$_id",
+                      id: "$_id",
                       address: 1,
                       title: 1,
                       coordinates: "$location.coordinates",
@@ -217,7 +214,7 @@ exports.get = async (req, res) => {
             },
             {
               $project: {
-				routeId: 1,
+                routeId: 1,
                 stopId: 1,
                 order: 1,
                 location: 1,
@@ -229,7 +226,7 @@ exports.get = async (req, res) => {
                 arrival_time: 1,
               },
             },
-			{
+            {
               $sort: { order: 1 }, // ✅ Sort stops by _id
             },
           ],
@@ -260,7 +257,7 @@ exports.get = async (req, res) => {
             },
           },
           status: 1,
-          createdAt:1
+          createdAt: 1,
         },
       },
       {
@@ -280,33 +277,36 @@ exports.get = async (req, res) => {
  * @public
  */
 exports.create = async (req, res, next) => {
-    const session = await mongoose.startSession();
+  const session = await mongoose.startSession();
+
   try {
     const { title, stops, status } = req.body;
-
-    // Start session
     await session.startTransaction();
-	let lastIntegerId = 1;
-    const lastRoute = await Route.findOne({}).sort({ 'integer_id': -1 } );
-    lastIntegerId = lastRoute ? (parseInt(lastRoute.integer_id) + lastIntegerId) : lastIntegerId; // auto increment
-    
-	const route = await new Route({
+
+    // auto increment
+    let lastIntegerId = 1;
+    const lastRoute = await Route.findOne({})
+      .sort({ integer_id: -1 })
+      .session(session);
+
+    lastIntegerId = lastRoute ? lastRoute.integer_id + 1 : 1;
+
+    const route = await new Route({
       title,
       status,
-	  integer_id:lastIntegerId
-    }).save();
-    if (route) {
-      await RouteStop.updateRouteStop(stops, route._id);
-      // finish transcation
-      await session.commitTransaction();
-      session.endSession();
+      integer_id: lastIntegerId,
+    }).save({ session });
 
-      res.status(httpStatus.CREATED);
-      return res.json({
-        status: true,
-        message: "route create successfully",
-      });
-    }
+    await RouteStop.updateRouteStop(stops, route._id, session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(httpStatus.CREATED).json({
+      status: true,
+      message: "route created successfully",
+    });
+
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -320,7 +320,7 @@ exports.create = async (req, res, next) => {
  */
 
 exports.update = async (req, res, next) => {
- const session = await mongoose.startSession();
+  const session = await mongoose.startSession();
   try {
     const { title, stops, status } = req.body;
     // Start session
@@ -341,7 +341,8 @@ exports.update = async (req, res, next) => {
         }
       );
       if (updateroute) {
-        await RouteStop.updateRouteStop(stops, req.params.routeId);
+        await RouteStop.deleteMany({ routeId: req.params.routeId },{ session });
+        await RouteStop.updateRouteStop(stops, req.params.routeId,session);
         // finish transcation
         await session.commitTransaction();
         session.endSession();
@@ -410,23 +411,16 @@ exports.list = async (req, res, next) => {
                 $options: "i",
               },
             },
-			{
-              integer_id: parseInt(req.query.search),
-            },
             // { max_seats: { $regex: new RegExp(req.query.search), $options: 'i' } },
             // {layout : { $regex: new RegExp(req.query.search), $options: 'i' } },
-            { status: req.query.search != "InActive" },
             // { last_seat: req.query.search != false},
           ],
         }
       : {};
 
     let sort = {};
-    if (!req.query.sort) {
-      sort = { createdAt: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = { [data.name]: data.order != "none" ? data.order : "asc" };
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
     }
 
     const aggregateQuery = Route.aggregate([
@@ -447,7 +441,7 @@ exports.list = async (req, res, next) => {
           total_stops: {
             $sum: 1,
           },
-		  integer_id: { $first: "$integer_id" },
+          integer_id: { $first: "$integer_id" },
           title: { $first: "$title" },
           status: { $first: "$status" },
           createdAt: { $first: "$createdAt" },
@@ -458,7 +452,7 @@ exports.list = async (req, res, next) => {
         $project: {
           _id: 0,
           ids: "$_id",
-		  integer_id: 1,
+          integer_id: 1,
           title: 1,
           total_stops: 1,
           status: 1,
@@ -484,7 +478,7 @@ exports.list = async (req, res, next) => {
     const result = await Route.aggregatePaginate(aggregateQuery, options);
 
     res.json(result);
-	  } catch (error) {
+  } catch (error) {
     next(error);
   }
 };
@@ -494,7 +488,7 @@ exports.list = async (req, res, next) => {
  * @public
  */
 exports.remove = (req, res, next) => {
-    BusSchedule.findOne({ routeId: req.params.routeId })
+  BusSchedule.findOne({ routeId: req.params.routeId })
     .then((result) => {
       if (result) {
         res.status(httpStatus.OK).json({

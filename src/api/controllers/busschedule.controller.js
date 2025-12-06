@@ -1,10 +1,9 @@
 const httpStatus = require("http-status");
 const { omit, isEmpty } = require("lodash");
+const mongoose = require("mongoose");
+const moment = require("moment-timezone");
 const BusSchedule = require("../models/busSchedule.model");
 const busScheduleLocation = require("../models/busScheduleLocation.model");
-const mongoose = require("mongoose");
-const moment = require('moment-timezone')
-
 
 exports.search = async (req, res, next) => {
   try {
@@ -82,11 +81,8 @@ exports.list = async (req, res) => {
       : {};
 
     let sort = {};
-    if (!req.query.sort) {
-      sort = { createdAt: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = { [data.name]: data.order != "none" ? data.order : "asc" };
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
+      sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
     }
 
     if (req.query.routeId) {
@@ -160,36 +156,27 @@ exports.list = async (req, res) => {
           _id: 0,
           ids: "$_id",
           routeId: 1,
-          bus_name: { $ifNull: ["$bus.name", "-"] },
+          bus_name: {
+            $ifNull: [{ $concat: ["$bus.name", "(", "$bus.code", ")"] }, "-"],
+          },
           route_name: { $ifNull: ["$route.title", "-"] },
-          start_to_end: {
-            $concat: [
-              {
-                $dateToString: {
-                  format: "%d-%m-%Y",
-                  date: "$start_date",
-                  timezone: DEFAULT_TIMEZONE,
-                },
-              },
-              " to ",
-              {
-                $dateToString: {
-                  format: "%d-%m-%Y",
-                  date: "$end_date",
-                  timezone: DEFAULT_TIMEZONE,
-                },
-              },
-            ],
+          start_date: {
+            $dateToString: {
+              format: "%d-%m-%Y",
+              date: "$start_date",
+              timezone: DEFAULT_TIMEZONE,
+            },
+          },
+          end_date: {
+            $dateToString: {
+              format: "%d-%m-%Y",
+              date: "$end_date",
+              timezone: DEFAULT_TIMEZONE,
+            },
           },
           departure_time: 1,
           arrival_time: 1,
-          status: {
-            $cond: {
-              if: { $eq: ["$status", true] },
-              then: "Active",
-              else: "Inactive",
-            },
-          },
+          status: 1,
           createdAt: 1,
         },
       },
@@ -204,7 +191,7 @@ exports.list = async (req, res) => {
       collation: { locale: "en" },
       customLabels: {
         totalDocs: "totalRecords",
-        docs: "busschedules",
+        docs: "items",
       },
       sort,
     };
@@ -212,7 +199,7 @@ exports.list = async (req, res) => {
     const result = await BusSchedule.aggregatePaginate(aggregateQuery, options);
 
     res.status(httpStatus.OK);
-    res.json({ data: result });
+    res.json(result);
   } catch (error) {
     console.log(error);
     return error;
@@ -260,8 +247,8 @@ exports.get = async (req, res) => {
               $project: {
                 location: 1,
                 stopId: 1,
-                departure_time:1,
-                arrival_time:1,
+                departure_time: 1,
+                arrival_time: 1,
                 // departure_time: {
                 //   $cond: {
                 //     if: { $ne: ["$departure_time", null] },
@@ -334,14 +321,14 @@ exports.get = async (req, res) => {
               in: {
                 id: "$$schedule_location._id",
                 stopId: "$$schedule_location.stopId",
-                location: "$$schedule_location.location",
                 departure_time: "$$schedule_location.departure_time",
                 arrival_time: "$$schedule_location.arrival_time",
               },
             },
           },
           every: 1,
-          routeId: { $ifNull: ["$route", {}] },
+          routeId: { $ifNull: ["$route.id", null] },
+          route_name: { $ifNull: ["$route.title", null] },
           busId: 1,
           departure_time: 1,
           arrival_time: 1,
@@ -393,7 +380,7 @@ exports.create = async (req, res) => {
       routeId: routeId.value,
       busId,
       departure_time: moment.tz(departure_time, DEFAULT_TIMEZONE).toDate(),
-      arrival_time:moment.tz(arrival_time, DEFAULT_TIMEZONE).toDate(),
+      arrival_time: moment.tz(arrival_time, DEFAULT_TIMEZONE).toDate(),
       start_date,
       end_date,
       status,
@@ -540,5 +527,5 @@ exports.remove = async (req, res) => {
         message: "Bus Schedule deleted successfully.",
       });
     })
-    .catch(e => next(e));
+    .catch((e) => next(e));
 };

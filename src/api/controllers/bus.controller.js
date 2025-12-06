@@ -48,14 +48,33 @@ exports.isRegistrationExists = async (req, res, next) => {
  * @public
  */
  exports.load = async (req, res, next) => {
-  try {
-    const bus = await Bus.find({status:true}).populate("bustypeId");
-    res.status(httpStatus.OK);
-    res.json({
-      message: 'Bus Type load data.',
-      data: Bus.transformOptions(bus),
-      status: true,
-    });
+try {
+    let condition = req.query.search != ""
+        ? {
+            title: {
+              $regex: `(\s+${req.query.search}|^${req.query.search})`,
+              $options: "i",
+            },
+            status: true,
+          }
+        : {
+            status: true,
+          };
+
+    const getBuses = await Bus.aggregate([
+      { $match: condition },
+      {
+        $project: {
+          _id: 0,
+          label:"$name",
+          value: "$_id",
+        },
+      },
+      {
+        $sort: { label: -1 },
+      },
+    ]);
+    res.json({ items: getBuses });
   } catch (error) {
     return next(error);
   }
@@ -579,6 +598,7 @@ exports.list = async (req, res, next) => {
           name: 1,
           reg_no:1,
           brand: 1,
+          code:1,
           model_no:1,
           chassis_no: 1,
           type:{ $ifNull:["$bustype.name",""]},

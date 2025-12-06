@@ -20,6 +20,7 @@ const createLocation = {
     landmark: Joi.string(),
     type: Joi.optional(),
     status: Joi.boolean(),
+    files:Joi.optional(),
   }),
 };
 
@@ -51,6 +52,7 @@ const updateLocation = {
       lng: Joi.number(),
       landmark: Joi.string(),
       status: Joi.boolean(),
+      files:Joi.optional(),
     })
     .unknown()
     .min(1),
