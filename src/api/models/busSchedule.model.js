@@ -16,8 +16,8 @@ const BusScheduleSchema = new Schema(
   {
     routeId: { type: ObjectId, ref: 'Route', required: true },
     busId: { type: ObjectId, ref: 'Bus' },
-    departure_time: {type: Date, required: true},
-    arrival_time:{type: Date, required: true},
+    departure_time: {type: Number},
+    arrival_time:{type: Number},
     every:{ type: [String],enum:routines},
     start_date:{type:Date,default:''},
     end_date:{type:Date,default:''},

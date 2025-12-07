@@ -18,13 +18,43 @@ exports.testData = (req, res) => {
 
 exports.load = async (req, res) => {
   try {
-    const route = await Route.find({ status: true }).sort({ _id: -1 });
-    res.status(httpStatus.OK);
-    res.json({
-      message: "stop load successfully.",
-      data: await Route.transformOptions(route),
-      status: true,
-    });
+    const condition = req.query.search && req.query.search.trim() !== ""
+        ? {
+            title: {
+              $regex: `(${req.query.search})`,
+              $options: "i",
+            },
+            status: true,
+          }
+        : { status: true };
+
+    const getRoutes = await Route.aggregate([
+      { $match: condition },
+
+      {
+        $lookup: {
+          from: "route_stops",
+          let: { routeId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$routeId", "$$routeId"] } } }
+          ],
+          as: "routeStop"
+        }
+      },
+
+      {
+        $project: {
+          _id: 0,
+          label: "$title",
+          value: "$_id",
+          totalStops: { $size: "$routeStop" }
+        }
+      },
+
+      { $sort: { label: 1 } }
+    ]);
+
+    res.json({ items: getRoutes });
   } catch (error) {
     console.log(error);
     return error;

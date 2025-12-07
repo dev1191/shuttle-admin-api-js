@@ -24,7 +24,7 @@ router
 router
   .route("/:busScheduleId")
   .get(getAuth("bus-schedule.get", "master.admin"), controller.get)
-  .patch(getAuth("bus-schedule.update", "master.admin"), controller.update)
+  .put(getAuth("bus-schedule.update", "master.admin"), controller.update)
 
   .delete(getAuth("bus-schedule.delete", "master.admin"), controller.remove);
 

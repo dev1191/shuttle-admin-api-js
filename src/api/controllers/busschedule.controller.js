@@ -160,22 +160,8 @@ exports.list = async (req, res) => {
             $ifNull: [{ $concat: ["$bus.name", "(", "$bus.code", ")"] }, "-"],
           },
           route_name: { $ifNull: ["$route.title", "-"] },
-          start_date: {
-            $dateToString: {
-              format: "%d-%m-%Y",
-              date: "$start_date",
-              timezone: DEFAULT_TIMEZONE,
-            },
-          },
-          end_date: {
-            $dateToString: {
-              format: "%d-%m-%Y",
-              date: "$end_date",
-              timezone: DEFAULT_TIMEZONE,
-            },
-          },
-          departure_time: 1,
-          arrival_time: 1,
+          start_date: 1,
+          end_date: 1,
           status: 1,
           createdAt: 1,
         },
@@ -247,35 +233,9 @@ exports.get = async (req, res) => {
               $project: {
                 location: 1,
                 stopId: 1,
+                stop_name: "$location.title",
                 departure_time: 1,
                 arrival_time: 1,
-                // departure_time: {
-                //   $cond: {
-                //     if: { $ne: ["$departure_time", null] },
-                //     then: {
-                //       $dateToString: {
-                //         format: "%H:%M",
-                //         date: "$departure_time",
-                //         timezone: DEFAULT_TIMEZONE,
-                //       },
-                //     },
-                //     else: null,
-                //   },
-                // },
-
-                // arrival_time: {
-                //   $cond: {
-                //     if: { $ne: ["$arrival_time", null] },
-                //     then: {
-                //       $dateToString: {
-                //         format: "%H:%M",
-                //         date: "$arrival_time",
-                //         timezone: DEFAULT_TIMEZONE,
-                //       },
-                //     },
-                //     else: null,
-                //   },
-                // },
                 order: 1,
               },
             },
@@ -321,8 +281,74 @@ exports.get = async (req, res) => {
               in: {
                 id: "$$schedule_location._id",
                 stopId: "$$schedule_location.stopId",
-                departure_time: "$$schedule_location.departure_time",
-                arrival_time: "$$schedule_location.arrival_time",
+                stop_name: "$$schedule_location.stop_name",
+                order: "$$schedule_location.order",
+                departure_time: {
+                  $cond: [
+                    { $ne: ["$$schedule_location.departure_time", null] },
+                    {
+                      $let: {
+                        vars: {
+                          hrs: { $floor: { $divide: ["$$schedule_location.departure_time", 60] } },
+                          mins: { $mod: ["$$schedule_location.departure_time", 60] },
+                        },
+                        in: {
+                          $concat: [
+                            {
+                              $cond: [
+                                { $lt: ["$$hrs", 10] },
+                                { $concat: ["0", { $toString: "$$hrs" }] },
+                                { $toString: "$$hrs" },
+                              ],
+                            },
+                            ":",
+                            {
+                              $cond: [
+                                { $lt: ["$$mins", 10] },
+                                { $concat: ["0", { $toString: "$$mins" }] },
+                                { $toString: "$$mins" },
+                              ],
+                            },
+                          ],
+                        },
+                      },
+                    },
+                    null,
+                  ],
+                },
+                arrival_time: {
+                  $cond: [
+                    { $ne: ["$$schedule_location.arrival_time", null] },
+                    {
+                      $let: {
+                        vars: {
+                          hrs: { $floor: { $divide: ["$$schedule_location.arrival_time", 60] } },
+                          mins: { $mod: ["$$schedule_location.arrival_time", 60] },
+                        },
+                        in: {
+                          $concat: [
+                            {
+                              $cond: [
+                                { $lt: ["$$hrs", 10] },
+                                { $concat: ["0", { $toString: "$$hrs" }] },
+                                { $toString: "$$hrs" },
+                              ],
+                            },
+                            ":",
+                            {
+                              $cond: [
+                                { $lt: ["$$mins", 10] },
+                                { $concat: ["0", { $toString: "$$mins" }] },
+                                { $toString: "$$mins" },
+                              ],
+                            },
+                          ],
+                        },
+                      },
+                    },
+                    null,
+                  ],
+                },
               },
             },
           },
@@ -330,8 +356,6 @@ exports.get = async (req, res) => {
           routeId: { $ifNull: ["$route.id", null] },
           route_name: { $ifNull: ["$route.title", null] },
           busId: 1,
-          departure_time: 1,
-          arrival_time: 1,
           start_date: 1,
           end_date: 1,
           status: 1,
@@ -344,11 +368,7 @@ exports.get = async (req, res) => {
     ]);
 
     res.status(httpStatus.OK);
-    res.json({
-      message: "Single route successfully.",
-      data: getBusSchedule[0], //Route.transFormSingleData(route),
-      status: true,
-    });
+    res.json(getBusSchedule[0]);
   } catch (error) {
     console.log(error);
     return error;
@@ -361,118 +381,121 @@ exports.get = async (req, res) => {
  */
 exports.create = async (req, res) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       every,
       routeId,
       busId,
-      arrival_time,
-      departure_time,
       start_date,
       end_date,
       stops,
       status,
     } = req.body;
-    // Start session
-    await session.startTransaction();
-    const busSchedule = await new BusSchedule({
-      every,
-      routeId: routeId.value,
-      busId,
-      departure_time: moment.tz(departure_time, DEFAULT_TIMEZONE).toDate(),
-      arrival_time: moment.tz(arrival_time, DEFAULT_TIMEZONE).toDate(),
-      start_date,
-      end_date,
-      status,
-    }).save();
-    if (busSchedule) {
-      await busScheduleLocation.createOrUpdate(busSchedule._id, stops);
-      // finish transcation
-      await session.commitTransaction();
-      session.endSession();
 
-      res.status(httpStatus.CREATED);
-      return res.json({
-        status: true,
-        message: "bus schedule create successfully",
-      });
-    }
+    const busSchedule = await BusSchedule.create(
+      [
+        {
+          every,
+          routeId,
+          busId,
+          start_date,
+          end_date,
+          status,
+        }
+      ],
+      { session }
+    );
+
+    const scheduleId = busSchedule[0]._id;
+
+    // IMPORTANT: must pass session to your custom function
+    await busScheduleLocation.createOrUpdate(scheduleId, stops, session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(httpStatus.CREATED).json({
+      status: true,
+      message: "bus schedule create successfully",
+    });
+
   } catch (error) {
     console.log(error);
     await session.abortTransaction();
     session.endSession();
-    return error;
+    return res.status(500).json({ status: false, error });
   }
 };
+
 
 /**
  * Update bus schedule
  * @public
  */
-exports.update = async (req, res) => {
+exports.update = async (req, res, next) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       every,
       routeId,
       busId,
-      arrival_time,
-      departure_time,
       start_date,
       end_date,
       stops,
       status,
     } = req.body;
-    // Start session
-    await session.startTransaction();
-    const busScheduleexists = await BusSchedule.findById(
-      req.params.busScheduleId
-    ).exec();
-    if (busScheduleexists) {
-      const objUpdate = {
-        every,
-        routeId: routeId.value,
-        busId,
-        departure_time,
-        arrival_time,
-        start_date,
-        end_date,
-        status,
-      };
-      const updateBusSchedule = await BusSchedule.findByIdAndUpdate(
-        req.params.busScheduleId,
-        {
-          $set: objUpdate,
-        },
-        {
-          new: true,
-        }
-      );
-      if (updateBusSchedule) {
-        await busScheduleLocation.createOrUpdate(
-          req.params.busScheduleId,
-          stops
-        );
-        // finish transcation
-        await session.commitTransaction();
-        session.endSession();
 
-        res.status(httpStatus.CREATED);
-        return res.json({
-          status: true,
-          message: "bus schedule updated successfully",
-        });
-      }
-    } else {
-      // finish transcation
-      await session.commitTransaction();
+    const busSchedule = await BusSchedule.findById(
+      req.params.busScheduleId
+    ).session(session);
+
+    if (!busSchedule) {
+      await session.abortTransaction();
       session.endSession();
-      res.status(httpStatus.OK);
-      res.json({
-        status: true,
-        message: "No route found.",
+
+      return res.status(httpStatus.NOT_FOUND).json({
+        status: false,
+        message: "Bus schedule not found",
       });
     }
+
+    const updateObj = {
+      every,
+      routeId,
+      busId,
+      start_date,
+      end_date,
+      status,
+    };
+
+    await BusSchedule.findByIdAndUpdate(
+      req.params.busScheduleId,
+      { $set: updateObj },
+      { new: true, session }
+    );
+
+    // IMPORTANT: pass session
+    await busScheduleLocation.deleteMany({
+      busScheduleId: req.params.busScheduleId,
+    }).session(session);
+    await busScheduleLocation.createOrUpdate(
+      req.params.busScheduleId,
+      stops,
+      session
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(httpStatus.OK).json({
+      status: true,
+      message: "Bus schedule updated successfully",
+    });
+
   } catch (error) {
     console.log("error", error);
     await session.abortTransaction();
@@ -480,6 +503,7 @@ exports.update = async (req, res) => {
     return next(error);
   }
 };
+
 
 /**
  * Update Status bus schedule

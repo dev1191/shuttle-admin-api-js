@@ -165,7 +165,7 @@ busSchema.statics = {
             max_seats: (item.buslayoutId) ? item.buslayoutId.max_seats : '',
             bustypeId: item.bustypeId._id,
             buslayoutId: item.buslayoutId._id,
-            adminId: item.adminId._id,
+            adminId: item.adminId._id ?? null,
             created_by: (item.adminId) ? item.adminId.firstname : '',
             picture: item.picture,
             amenities: item.amenities,

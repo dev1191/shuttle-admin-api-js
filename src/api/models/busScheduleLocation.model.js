@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { omitBy, isNil } = require("lodash");
 const paginateAggregate = require("mongoose-aggregate-paginate-v2");
+const { timeToMinutes } = require('../utils/time')
 const { Schema } = mongoose;
 const { ObjectId } = Schema;
 
@@ -16,37 +17,35 @@ const BusScheduleLocationSchema = new Schema(
 );
 
 BusScheduleLocationSchema.statics = {
-  async createOrUpdate(busScheduleId, dataObj) {
+  async createOrUpdate(scheduleId, stops, session) {
     try {
-      // if exists update route and if stop not found then create
-      dataObj.forEach(async (item, index) => {
-        let objUpdate = {
-          busScheduleId: busScheduleId,
-          stopId: item.stopId,
-          departure_time: item.departure_time,
-          arrival_time: item.arrival_time,
-          order: index + 1,
+      if (!Array.isArray(stops) || stops.length === 0) return;
+
+      const ops = stops.map((s) => {
+        const updateData = {
+          busScheduleId: scheduleId,
+          stopId: s.stopId,
+          order: s.order,
+          // arrival_time and departure_time can be provided as "HH:MM" strings or as minutes
+          arrival_time: timeToMinutes(s.arrival_time),
+          departure_time: timeToMinutes(s.departure_time),
         };
-        if (await this.exists({ busScheduleId })) {
-          await this.findOneAndUpdate(
-            { busScheduleId, stopId: objUpdate.stopId },
-            objUpdate,
-            { new: true, upsert: true }
-          );
-        } else {
-          await this.findOneAndUpdate(
-            { busScheduleId, stopId: objUpdate.stopId },
-            objUpdate,
-            { new: true, upsert: true }
-          );
-        }
+
+        return this.updateOne(
+          { busScheduleId: scheduleId, stopId: s.stopId },
+          { $set: updateData },
+          { upsert: true, session }
+        );
       });
+
+      await Promise.all(ops);
     } catch (err) {
       console.log(err);
-      return err;
+      throw err;
     }
   },
 };
+
 
 BusScheduleLocationSchema.plugin(paginateAggregate);
 
