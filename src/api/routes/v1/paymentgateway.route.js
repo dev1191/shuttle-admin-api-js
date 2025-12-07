@@ -8,13 +8,17 @@ const router = express.Router();
 
 router.route("/is-enabled").get(getAuth("master.admin"), controller.isEnabled);
 
-router
-  .route("/:site")
-  .get(getAuth("master.admin"), controller.get)
 
+router
+  .route("/")
+  .get(getAuth("master.admin"), controller.get);
+
+  
+router
+  .route("/:paymentName")
   /**
    * update the single location
    * */
-  .patch(getAuth("master.admin"), controller.update);
+  .put(getAuth("master.admin"), controller.update);
 
 module.exports = router;

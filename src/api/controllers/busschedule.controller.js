@@ -90,45 +90,128 @@ exports.list = async (req, res) => {
     }
 
     const aggregateQuery = BusSchedule.aggregate([
-      //   {
-      //     $lookup: {
-      //       from: "bus_schedule_locations",
-      //       let: { busScheduleId: "$_id" },
-      //       pipeline: [
-      //         {
-      //           $match: { $expr: { $eq: ["$busScheduleId", "$$busScheduleId"] } },
-      //         },
-      //         {
-      //           $lookup: {
-      //             from: "locations",
-      //             let: { stopId: "$stopId" },
-      //             pipeline: [
-      //               { $match: { $expr: { $eq: ["$_id", "$$stopId"] } } },
-      //               {
-      //                 $project: {
-      //                   _id: 0,
-      //                   title: 1,
-      //                 },
-      //               },
-      //             ],
-      //             as: "location",
-      //           },
-      //         },
-      //         {
-      //           $unwind: "$location",
-      //         },
-      //         {
-      //           $project: {
-      //             location: 1,
-      //             stopId: 1,
-      //             departure_time: 1,
-      //             arrival_time: 1,
-      //           },
-      //         },
-      //       ],
-      //       as: "bus_schedule_location",
-      //     },
-      //   },
+      {
+        $lookup: {
+          from: "bus_schedule_locations",
+          let: { busScheduleId: "$_id" },
+          pipeline: [
+            {
+              $match: { $expr: { $eq: ["$busScheduleId", "$$busScheduleId"] } },
+            },
+
+            {
+              $addFields: {
+                departure_time_text: {
+                  $concat: [
+                    {
+                      $cond: [
+                        {
+                          $lt: [
+                            { $floor: { $divide: ["$departure_time", 60] } },
+                            10,
+                          ],
+                        },
+                        {
+                          $concat: [
+                            "0",
+                            {
+                              $toString: {
+                                $floor: { $divide: ["$departure_time", 60] },
+                              },
+                            },
+                          ],
+                        },
+                        {
+                          $toString: {
+                            $floor: { $divide: ["$departure_time", 60] },
+                          },
+                        },
+                      ],
+                    },
+                    ":",
+                    {
+                      $cond: [
+                        { $lt: [{ $mod: ["$departure_time", 60] }, 10] },
+                        {
+                          $concat: [
+                            "0",
+                            { $toString: { $mod: ["$departure_time", 60] } },
+                          ],
+                        },
+                        { $toString: { $mod: ["$departure_time", 60] } },
+                      ],
+                    },
+                  ],
+                },
+
+                arrival_time_text: {
+                  $concat: [
+                    {
+                      $cond: [
+                        {
+                          $lt: [
+                            { $floor: { $divide: ["$arrival_time", 60] } },
+                            10,
+                          ],
+                        },
+                        {
+                          $concat: [
+                            "0",
+                            {
+                              $toString: {
+                                $floor: { $divide: ["$arrival_time", 60] },
+                              },
+                            },
+                          ],
+                        },
+                        {
+                          $toString: {
+                            $floor: { $divide: ["$arrival_time", 60] },
+                          },
+                        },
+                      ],
+                    },
+                    ":",
+                    {
+                      $cond: [
+                        { $lt: [{ $mod: ["$arrival_time", 60] }, 10] },
+                        {
+                          $concat: [
+                            "0",
+                            { $toString: { $mod: ["$arrival_time", 60] } },
+                          ],
+                        },
+                        { $toString: { $mod: ["$arrival_time", 60] } },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+
+            {
+              $project: {
+                departure_time_text: "$departure_time_text",
+                arrival_time_text: "$arrival_time_text",
+              },
+            },
+          ],
+          as: "busScheduleStop",
+        },
+      },
+      {
+        $addFields: {
+          depart_time: {
+            $arrayElemAt: ["$busScheduleStop.departure_time_text", 0],
+          },
+          arrive_time: {
+            $arrayElemAt: [
+              "$busScheduleStop.arrival_time_text",
+              { $subtract: [{ $size: "$busScheduleStop" }, 1] },
+            ],
+          },
+        },
+      },
       {
         $lookup: {
           from: "buses",
@@ -160,10 +243,22 @@ exports.list = async (req, res) => {
             $ifNull: [{ $concat: ["$bus.name", "(", "$bus.code", ")"] }, "-"],
           },
           route_name: { $ifNull: ["$route.title", "-"] },
-          start_date: 1,
-          end_date: 1,
+          start_date: {
+            $dateToString: {
+              format: "%d-%m-%Y",
+              date: "$start_date"
+            },
+          },
+          end_date: {
+            $dateToString: {
+              format: "%d-%m-%Y",
+              date: "$end_date",
+            },
+          },
           status: 1,
           createdAt: 1,
+          depart_time: { $ifNull: ["$depart_time", "-"] },
+          arrive_time: { $ifNull: ["$arrive_time", "-"] },
         },
       },
       {
@@ -289,8 +384,17 @@ exports.get = async (req, res) => {
                     {
                       $let: {
                         vars: {
-                          hrs: { $floor: { $divide: ["$$schedule_location.departure_time", 60] } },
-                          mins: { $mod: ["$$schedule_location.departure_time", 60] },
+                          hrs: {
+                            $floor: {
+                              $divide: [
+                                "$$schedule_location.departure_time",
+                                60,
+                              ],
+                            },
+                          },
+                          mins: {
+                            $mod: ["$$schedule_location.departure_time", 60],
+                          },
                         },
                         in: {
                           $concat: [
@@ -322,8 +426,14 @@ exports.get = async (req, res) => {
                     {
                       $let: {
                         vars: {
-                          hrs: { $floor: { $divide: ["$$schedule_location.arrival_time", 60] } },
-                          mins: { $mod: ["$$schedule_location.arrival_time", 60] },
+                          hrs: {
+                            $floor: {
+                              $divide: ["$$schedule_location.arrival_time", 60],
+                            },
+                          },
+                          mins: {
+                            $mod: ["$$schedule_location.arrival_time", 60],
+                          },
                         },
                         in: {
                           $concat: [
@@ -384,15 +494,7 @@ exports.create = async (req, res) => {
   session.startTransaction();
 
   try {
-    const {
-      every,
-      routeId,
-      busId,
-      start_date,
-      end_date,
-      stops,
-      status,
-    } = req.body;
+    const { every, routeId, busId, start_date, end_date, stops, status } = req.body;
 
     const busSchedule = await BusSchedule.create(
       [
@@ -403,7 +505,7 @@ exports.create = async (req, res) => {
           start_date,
           end_date,
           status,
-        }
+        },
       ],
       { session }
     );
@@ -420,7 +522,6 @@ exports.create = async (req, res) => {
       status: true,
       message: "bus schedule create successfully",
     });
-
   } catch (error) {
     console.log(error);
     await session.abortTransaction();
@@ -428,7 +529,6 @@ exports.create = async (req, res) => {
     return res.status(500).json({ status: false, error });
   }
 };
-
 
 /**
  * Update bus schedule
@@ -439,15 +539,7 @@ exports.update = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const {
-      every,
-      routeId,
-      busId,
-      start_date,
-      end_date,
-      stops,
-      status,
-    } = req.body;
+    const { every, routeId, busId, start_date, end_date, stops, status } = req.body;
 
     const busSchedule = await BusSchedule.findById(
       req.params.busScheduleId
@@ -479,9 +571,11 @@ exports.update = async (req, res, next) => {
     );
 
     // IMPORTANT: pass session
-    await busScheduleLocation.deleteMany({
-      busScheduleId: req.params.busScheduleId,
-    }).session(session);
+    await busScheduleLocation
+      .deleteMany({
+        busScheduleId: req.params.busScheduleId,
+      })
+      .session(session);
     await busScheduleLocation.createOrUpdate(
       req.params.busScheduleId,
       stops,
@@ -495,7 +589,6 @@ exports.update = async (req, res, next) => {
       status: true,
       message: "Bus schedule updated successfully",
     });
-
   } catch (error) {
     console.log("error", error);
     await session.abortTransaction();
@@ -503,7 +596,6 @@ exports.update = async (req, res, next) => {
     return next(error);
   }
 };
-
 
 /**
  * Update Status bus schedule
@@ -513,9 +605,9 @@ exports.update = async (req, res, next) => {
 exports.status = async (req, res) => {
   try {
     const { status } = req.body;
-    const update = await BusSchedule.updateOne(
-      { _id: req.params.busScheduleId },
-      { status: status == "Active" ? "true" : "false" }
+    const update = await BusSchedule.findByIdAndUpdate(
+      req.params.busScheduleId,
+      { status: status }
     );
     if (update) {
       res.json({

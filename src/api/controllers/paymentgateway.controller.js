@@ -1,5 +1,7 @@
-const paymentGateway = require("../models/paymentGateway.model");
 const httpStatus = require("http-status");
+const mongoose = require("mongoose");
+const paymentGateway = require("../models/paymentGateway.model");
+const APIError = require("../utils/APIError");
 
 /**
  *  update payment is enabled
@@ -36,18 +38,66 @@ exports.isEnabled = async (req, res, next) => {
  */
 exports.get = async (req, res, next) => {
   try {
-    const getPaymentGateway = await paymentGateway.find({
-      site: req.params.site,
-    });
-    const convertedObject = {};
+    const getPaymentGateway = await paymentGateway.aggregate([
+      {
+        $group: {
+          _id: "$site", // Group by the 'site' field
+          name: { $push: { id: "$_id", name: "$name", value: "$value" } }, // Collect the associated 'name' and 'value' fields for each site
+          is_enabled: {
+            $max: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$name", "is_enabled"] },
+                    { $eq: ["$value", "1"] },
+                  ],
+                },
+                1,
+                0,
+              ], // Check if 'name' is 'is_enabled' and 'value' is 1
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          site_slug: {
+            $replaceAll: {
+              input: { $toLower: "$_id" }, // Convert 'site' to lowercase
+              find: " ",
+              replacement: "_", // Replace spaces with underscores
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 1, // Include the site name as '_id'
+          site_slug: 1, // Include the slug
+          name: 1, // Include the keys array
+          is_enabled: {
+            $cond: { if: { $eq: ["$is_enabled", 1] }, then: true, else: false },
+          }, // Set 'is_enabled' to true if it's 1, otherwise false
+        },
+      },
+      {
+        $sort: {
+          _id: 1,
+        },
+      },
+    ]);
+    // const getPaymentGateway = await paymentGateway.find({
+    //   site: req.params.site,
+    // });
+    // const convertedObject = {};
 
-    getPaymentGateway.forEach((item) => {
-      convertedObject[item.name] = item.value;
-    });
+    // getPaymentGateway.forEach((item) => {
+    //   convertedObject[item.name] = item.value;
+    // });
     res.status(httpStatus.OK);
     res.json({
       message: `payment setting fetched successfully.`,
-      data: convertedObject,
+      data: getPaymentGateway,
       status: true,
     });
   } catch (error) {
@@ -61,115 +111,56 @@ exports.get = async (req, res, next) => {
  * @public
  */
 exports.update = async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
-    const {
-      is_enabled,
-      mode,
-      currency,
-      username,
-      password,
-      key,
-      secret,
-      integration_id,
-      frame_id,
-    } = req.body;
-    const getPaymemtSetting = await paymentGateway.findOne({
-      name: "is_enabled",
-      value: "1",
-    });
-  
-    if (getPaymemtSetting && getPaymemtSetting.site != req.params.site && is_enabled == "1") {
-      res.status(httpStatus.OK);
-      res.json({
-        message: `Please disabled the payment gateway ${getPaymemtSetting.site} first.`,
-        status: false,
-      });
+    // Start session
+    await session.startTransaction();
+    const { _id, site_slug, name, is_enabled } = req.body;
+    const { paymentName } = req.query;
+
+    if (name && name.length > 0) {
+      const operations = name.map((data) => ({
+        updateOne: {
+          filter: {
+            site: _id,
+            name: data.name,
+            _id:
+              new mongoose.Types.ObjectId(data.id)
+              || new mongoose.Types.ObjectId(),
+          },
+          update: {
+            $set: {
+              value: data.value,
+            },
+          },
+        },
+      }));
+      await paymentGateway.bulkWrite(operations);
     } else {
-      let update = {};
-      if (req.params.site === "Razorpay") {
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "is_enabled" },
-          { $set: { value: is_enabled ? "1" : "0" } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "mode" },
-          { $set: { value: mode } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "key" },
-          { $set: { value: key } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "secret" },
-          { $set: { value: secret } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "currency" },
-          { $set: { value: currency } }
-        );
-      } else if (req.params.site === "Paystack") {
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "is_enabled" },
-          { $set: { value: is_enabled ? "1" : "0" } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "mode" },
-          { $set: { value: mode } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "key" },
-          { $set: { value: key } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "secret" },
-          { $set: { value: secret } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "currency" },
-          { $set: { value: currency } }
-        );
-      } else if (req.params.site === "Paymob") {
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "is_enabled" },
-          { $set: { value: is_enabled ? "1" : "0" } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "mode" },
-          { $set: { value: mode } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "key" },
-          { $set: { value: key } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "secret" },
-          { $set: { value: secret } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "username" },
-          { $set: { value: username } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "password" },
-          { $set: { value: password } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "integration_id" },
-          { $set: { value: integration_id } }
-        );
-        await paymentGateway.updateOne(
-          { site: req.params.site, name: "frame_id" },
-          { $set: { value: frame_id } }
-        );
-      }
-      res.status(httpStatus.OK);
-      res.json({
-        message: `Payment gateway ${req.params.site} updated successfully.`,
-        status: true,
-      });
+      await paymentGateway.updateOne(
+        {
+          site: paymentName,
+          name: "is_enabled",
+        },
+        {
+          $set: {
+            value: is_enabled,
+          },
+        }
+      );
     }
+
+    // finish transcation
+    await session.commitTransaction();
+    session.endSession();
+    res.status(httpStatus.OK);
+    res.json({
+      message: `Payment gateway ${req.params.site} updated successfully.`,
+      status: true,
+    });
   } catch (error) {
-    console.log(error);
+    await session.abortTransaction();
+    session.endSession();
     throw new APIError(error);
   }
 };

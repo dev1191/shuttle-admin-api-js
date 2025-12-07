@@ -26,7 +26,9 @@
     "validate": "eslint ./src && yarn test",
     "postpublish": "git push --tags",
     "docs": "apidoc -i src -o docs",
-    "postdocs": "open-cli docs/index.html"
+    "postdocs": "open-cli docs/index.html",
+    "seed": "node src/api/seeders/index.js",
+    "seed:email-templates": "node src/api/seeders/index.js email-templates"
   },
   "repository": {
     "type": "git",
