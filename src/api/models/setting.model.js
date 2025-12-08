@@ -14,6 +14,17 @@ const ReferralSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+const SocialLinkSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true }, // e.g., "Facebook", "Twitter", "LinkedIn"
+    url: { type: String, required: true }, // Social media URL
+    order: { type: Number, default: 0 }, // Display order
+    is_active: { type: Boolean, default: true }, // Show/hide link
+  },
+  { _id: false }
+);
+
 /**
  * setting Schema
  * @private
@@ -55,6 +66,10 @@ const settingSchema = new mongoose.Schema(
       driver_online_location_update_interval: { type: Number, default: 1000 },
       max_distance: { type: Number, default: 2000 },
       prebooking_time: { type: Number, default: 30 },
+      theme_mode: { type: String, default: "light" },
+      primary_color: { type: String, default: "#18a058" },
+      sidebar_style: { type: String, default: "dark" },
+      app_url: { type: String, default: "" },
     },
     smtp: {
       is_production: { type: Boolean, default: false },
@@ -129,6 +144,10 @@ const settingSchema = new mongoose.Schema(
       minimum_time: { type: Number, default: 0 },
       contents: { type: String, default: "" },
     },
+    social_links: {
+      type: [SocialLinkSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -152,8 +171,8 @@ settingSchema.statics = {
         return logo;
       }
       if (
-        settingexists.payments.logo == ""
-        || settingexists.payments.logo == null
+        settingexists.payments.logo == "" ||
+        settingexists.payments.logo == null
       ) {
         const logo = await imageUpload(image, `${uuidv4()}`, FolderName);
         return logo;
@@ -307,6 +326,14 @@ settingSchema.statics = {
         type: "referral_policy",
       };
     }
+    if (type == "social_links") {
+      return {
+        id: data._id,
+        social_links: data.social_links
+          .filter((link) => link.is_active)
+          .sort((a, b) => a.order - b.order),
+      };
+    }
   },
   async getrefunds() {
     const getrefunds = await this.findOne({}, "refunds").lean();
@@ -329,14 +356,16 @@ settingSchema.statics = {
     return getStorage.storage;
   },
   isValidURL(str) {
-    const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
+    const regex =
+      /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
     if (!regex.test(str)) {
       return false;
     }
     return true;
   },
   isValidBase64(str) {
-    const regex = /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
+    const regex =
+      /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
 
     if (regex.test(str)) {
       return true;

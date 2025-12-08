@@ -7,9 +7,7 @@ const Bus = require("../models/bus.model");
 const Route = require("../models/route.model");
 const busSchedule = require("../models/busSchedule.model");
 const Bus_galleries = require("../models/busGallaries.model");
-const {imageDelete,imageUpload } = require("../services/uploaderService");
-
-
+const { imageDelete, imageUpload } = require("../services/uploaderService");
 
 /**
  * check bus with the Plate/Registration number.
@@ -17,7 +15,7 @@ const {imageDelete,imageUpload } = require("../services/uploaderService");
  */
 exports.isRegistrationExists = async (req, res, next) => {
   try {
-    const { reg_no, name, model_no, chassis_no,type } = req.body;
+    const { reg_no, name, model_no, chassis_no, type } = req.body;
     const isExists = await Bus.countDocuments({
       $or: [
         { reg_no: reg_no },
@@ -27,7 +25,7 @@ exports.isRegistrationExists = async (req, res, next) => {
       ],
     });
 
-     if (isExists && isExists > 1) {
+    if (isExists && isExists > 1) {
       res.status(httpStatus.OK);
       res.json({
         status: false,
@@ -47,9 +45,10 @@ exports.isRegistrationExists = async (req, res, next) => {
  * Load user and append to req.
  * @public
  */
- exports.load = async (req, res, next) => {
-try {
-    let condition = req.query.search != ""
+exports.load = async (req, res, next) => {
+  try {
+    let condition =
+      req.query.search != ""
         ? {
             title: {
               $regex: `(\s+${req.query.search}|^${req.query.search})`,
@@ -66,7 +65,7 @@ try {
       {
         $project: {
           _id: 0,
-          label:"$name",
+          label: "$name",
           value: "$_id",
         },
       },
@@ -84,20 +83,18 @@ try {
  * Load user and append to req.
  * @public
  */
- exports.loadByRoute = async (req, res, next) => {
+exports.loadByRoute = async (req, res, next) => {
   try {
-    
     //const getTimetable = await TimeTable.find({status:true},"busId");
     //const getBusId = getTimetable.map((v) => { return v.busId });
     const getBuses = await Bus.find({}).populate("buslayoutId").lean();
-    console.log("getBuses",getBuses);
+    console.log("getBuses", getBuses);
     res.status(httpStatus.OK);
     res.json({
-      message: 'Bus Type load data.',
+      message: "Bus Type load data.",
       data: Bus.transformOptions(getBuses),
       status: true,
     });
-
   } catch (error) {
     console.log("error", error);
     return next(error);
@@ -110,7 +107,7 @@ try {
  */
 exports.get = async (req, res) => {
   try {
-    const bus = await Bus.findById(req.params.busId).populate("adminId").populate("bustypeId");
+    const bus = await Bus.findById(req.params.busId).populate("bustypeId");
     res.status(httpStatus.OK);
     res.json({
       message: "Bus fetched successfully.",
@@ -323,54 +320,13 @@ exports.create = async (req, res, next) => {
       chassis_no,
       status,
       amenities,
+      picture,
+      certificate_registration,
+      certificate_pollution,
+      certificate_insurance,
+      certificate_fitness,
+      certificate_permit,
     };
-    if (picture) {
-      objBus.picture = await imageUpload(
-        picture,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (certificate_registration) {
-      objBus.certificate_registration = await imageUpload(
-        certificate_registration,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (certificate_pollution) {
-      objBus.certificate_pollution = await imageUpload(
-        certificate_pollution,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (certificate_insurance) {
-      objBus.certificate_insurance = await imageUpload(
-        certificate_insurance,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (certificate_fitness) {
-      objBus.certificate_fitness = await imageUpload(
-        certificate_fitness,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (certificate_permit) {
-      objBus.certificate_permit = await imageUpload(
-        certificate_permit,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
 
     const bus = new Bus(objBus);
     const savedBus = await bus.save();
@@ -378,7 +334,7 @@ exports.create = async (req, res, next) => {
 
     res.status(httpStatus.CREATED);
     return res.json({
-      message: 'Bus created successfully.',
+      message: "Bus created successfully.",
       bus: savedBus,
       status: true,
     });
@@ -393,8 +349,37 @@ exports.create = async (req, res, next) => {
  */
 exports.update = async (req, res, next) => {
   try {
+    // Check if only status is being updated
+    const requestKeys = Object.keys(req.body);
+    const isStatusOnlyUpdate =
+      requestKeys.length === 1 && requestKeys[0] === "status";
+
+    if (isStatusOnlyUpdate) {
+      const { status } = req.body;
+      // Quick status-only update
+      const updatebus = await Bus.findByIdAndUpdate(
+        req.params.busId,
+        {
+          $set: { status },
+        },
+        {
+          new: true,
+        }
+      );
+
+      const transformedBus = updatebus.transform();
+      res.status(httpStatus.OK);
+      return res.json({
+        status: true,
+        message: "Bus status updated successfully.",
+        data: transformedBus,
+      });
+    }
+
+    // Full update with image processing
     const busexists = await Bus.findById(req.params.busId).exec();
     const FolderName = process.env.S3_BUCKET_BUS;
+
     const objUpdate = {
       adminId: req.body.adminId,
       bustypeId: req.body.bustypeId,
@@ -402,65 +387,17 @@ exports.update = async (req, res, next) => {
       name: req.body.name,
       reg_no: req.body.reg_no,
       status: req.body.status,
-      brand:req.body.brand,
-      model_no:req.body.model_no,
-      chassis_no:req.body.chassis_no,
-      amenities:req.body.amenities,
+      brand: req.body.brand,
+      model_no: req.body.model_no,
+      chassis_no: req.body.chassis_no,
+      amenities: req.body.amenities,
+      picture: req.body.picture,
+      certificate_registration: req.body.certificate_registration,
+      certificate_pollution: req.body.certificate_pollution,
+      certificate_insurance: req.body.certificate_insurance,
+      certificate_fitness: req.body.certificate_fitness,
+      certificate_permit: req.body.certificate_permit,
     };
-
-    if (Bus.isValidBase64(req.body.picture)) {
-      await imageDelete(busexists.picture, FolderName);
-      objUpdate.picture = await imageUpload(
-        req.body.picture,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (Bus.isValidBase64(req.body.certificate_registration)) {
-      await imageDelete(busexists.certificate_registration, FolderName);
-      objUpdate.certificate_registration = await imageUpload(
-        req.body.certificate_registration,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (Bus.isValidBase64(req.body.certificate_pollution)) {
-      await imageDelete(busexists.certificate_pollution, FolderName);
-      objUpdate.certificate_pollution = await imageUpload(
-        req.body.certificate_pollution,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (Bus.isValidBase64(req.body.certificate_insurance)) {
-      await imageDelete(busexists.certificate_insurance, FolderName);
-      objUpdate.certificate_insurance = await imageUpload(
-        req.body.certificate_insurance,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (Bus.isValidBase64(req.body.certificate_fitness)) {
-      await imageDelete(busexists.certificate_fitness, FolderName);
-      objUpdate.certificate_fitness = await imageUpload(
-        req.body.certificate_fitness,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
-
-    if (Bus.isValidBase64(req.body.certificate_permit)) {
-      await imageDelete(busexists.certificate_permit, FolderName);
-      objUpdate.certificate_permit = await imageUpload(
-        req.body.certificate_permit,
-        `${uuidv4()}`,
-        FolderName
-      );
-    }
 
     const updatebus = await Bus.findByIdAndUpdate(
       req.params.busId,
@@ -471,13 +408,13 @@ exports.update = async (req, res, next) => {
         new: true,
       }
     );
- 
+
     const transformedBus = updatebus.transform();
     res.status(httpStatus.OK);
     res.json({
       status: true,
       message: "Bus updated successfully.",
-      data:transformedBus,
+      data: transformedBus,
     });
   } catch (error) {
     next(error);
@@ -490,7 +427,6 @@ exports.update = async (req, res, next) => {
  */
 exports.list = async (req, res, next) => {
   try {
-    
     let condition = req.query.search
       ? {
           $and: [
@@ -533,27 +469,22 @@ exports.list = async (req, res, next) => {
                   },
                 },
                 {
-                  'type': {
+                  type: {
                     $regex: new RegExp(req.query.search),
                     $options: "i",
                   },
                 },
-                { status: req.query.search != 'inactive'}
-                
+                { status: req.query.search != "inactive" },
               ],
             },
           ],
         }
-      : { };
-
+      : {};
 
     let sort = {};
-    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
       sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
-    } 
-
-
-
+    }
 
     const aggregateQuery = Bus.aggregate([
       {
@@ -579,7 +510,7 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$buslayout"
+        $unwind: "$buslayout",
       },
       {
         $lookup: {
@@ -590,31 +521,31 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$bustype"
+        $unwind: "$bustype",
       },
       {
-        $project:{
+        $project: {
           ids: "$_id",
           name: 1,
-          reg_no:1,
+          reg_no: 1,
           brand: 1,
-          code:1,
-          model_no:1,
+          code: 1,
+          model_no: 1,
           chassis_no: 1,
-          type:{ $ifNull:["$bustype.name",""]},
-          layout:{ $ifNull:["$buslayout.name",""]},
-          max_seats:{ $ifNull:["$buslayout.max_seats",""]},
-          created_by:{ $ifNull:["$admin.firstname","-"]},
+          type: { $ifNull: ["$bustype.name", ""] },
+          layout: { $ifNull: ["$buslayout.name", ""] },
+          max_seats: { $ifNull: ["$buslayout.max_seats", ""] },
+          created_by: { $ifNull: ["$admin.firstname", "-"] },
           picture: 1,
           amenities: 1,
           certificate_registration: 1,
           certificate_pollution: 1,
           certificate_insurance: 1,
-          certificate_fitness:1,
+          certificate_fitness: 1,
           certificate_permit: 1,
-          status:1,
-          createdAt:1
-        }
+          status: 1,
+          createdAt: 1,
+        },
       },
       {
         $match: condition,
@@ -644,47 +575,45 @@ exports.list = async (req, res, next) => {
  * @public
  */
 exports.remove = async (req, res, next) => {
-  try{
+  try {
     const FolderName = process.env.S3_BUCKET_BUS;
 
-    if(await busSchedule.exists({busId:req.params.busId})){
+    if (await busSchedule.exists({ busId: req.params.busId })) {
       res.status(httpStatus.OK).json({
         status: false,
-        message: 'Remove the bus schedule first!',
-       })
+        message: "Remove the bus schedule first!",
+      });
+    } else if (await Bus.exists({ _id: req.params.busId })) {
+      const busexists = await Bus.findOne({ _id: req.params.busId });
+      if (Bus.isValidURL(busexists.picture)) {
+        await imageDelete(busexists.picture, FolderName);
+      }
+      if (Bus.isValidURL(busexists.certificate_registration)) {
+        await imageDelete(busexists.certificate_registration, FolderName);
+      }
+      if (Bus.isValidURL(busexists.certificate_pollution)) {
+        await imageDelete(busexists.certificate_pollution, FolderName);
+      }
+      if (Bus.isValidURL(busexists.certification_insurance)) {
+        await imageDelete(busexists.certification_insurance, FolderName);
+      }
+      if (Bus.isValidURL(busexists.certificate_fitness)) {
+        await imageDelete(busexists.certificate_fitness, FolderName);
+      }
+      if (Bus.isValidURL(busexists.certificate_permit)) {
+        await imageDelete(busexists.certificate_permit, FolderName);
+      }
 
-     }else if(await Bus.exists({_id:req.params.busId})){
-        const busexists = await Bus.findOne({_id:req.params.busId});
-        if(Bus.isValidURL(busexists.picture)){
-          await imageDelete(busexists.picture,FolderName);
-        }
-        if(Bus.isValidURL(busexists.certificate_registration)){
-          await imageDelete(busexists.certificate_registration,FolderName);
-        }
-        if(Bus.isValidURL(busexists.certificate_pollution)){
-          await imageDelete(busexists.certificate_pollution,FolderName);
-        }
-        if(Bus.isValidURL(busexists.certification_insurance)){
-          await imageDelete(busexists.certification_insurance,FolderName);
-        }
-        if(Bus.isValidURL(busexists.certificate_fitness)){
-          await imageDelete(busexists.certificate_fitness,FolderName);
-        }
-        if(Bus.isValidURL(busexists.certificate_permit)){
-          await imageDelete(busexists.certificate_permit,FolderName);
-        }
-
-      //Listeners.eventsListener.emit("REMOVE-TICKET", req.params.busId); // event to ASSIGNED ticket to driver    
-      const deleteBus = await Bus.deleteOne({_id: req.params.busId});
-        if(deleteBus){
-          res.status(httpStatus.OK).json({
-                 status: true,
-                 message: 'Bus deleted successfully.',
-            })
-        }
+      //Listeners.eventsListener.emit("REMOVE-TICKET", req.params.busId); // event to ASSIGNED ticket to driver
+      const deleteBus = await Bus.deleteOne({ _id: req.params.busId });
+      if (deleteBus) {
+        res.status(httpStatus.OK).json({
+          status: true,
+          message: "Bus deleted successfully.",
+        });
+      }
     }
-
-  }catch(e){
-    next(e)
+  } catch (e) {
+    next(e);
   }
 };

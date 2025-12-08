@@ -5,8 +5,10 @@ module.exports = {
   listEmailTemplates: {
     query: Joi.object({
       page: Joi.number().min(1),
-      perPage: Joi.number().min(1).max(100),
+      limit: Joi.number().min(1).max(100),
       search: Joi.string().allow(""),
+      sortBy: Joi.string().allow(""),
+      sortDesc: Joi.string().allow(""),
       recipient_type: Joi.string().valid(
         "admin",
         "operator",

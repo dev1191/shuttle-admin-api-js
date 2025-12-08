@@ -2,7 +2,7 @@ const express = require("express");
 const { validate } = require("express-validation");
 const controller = require("../../controllers/emailtemplate.controller");
 const validation = require("../../validations/emailtemplate.validation");
-const { authorize } = require("../../middlewares/auth");
+const { getAuth } = require("../../middlewares/auth");
 
 const router = express.Router();
 
@@ -34,7 +34,11 @@ router
    * @apiError (Unauthorized 401)  Unauthorized  Only authenticated users can access the data
    * @apiError (Forbidden 403)     Forbidden     Only admins can access the data
    */
-  .get(authorize(), validate(validation.listEmailTemplates), controller.list)
+  .get(
+    getAuth("master.admin"),
+    validate(validation.listEmailTemplates),
+    controller.list
+  )
   /**
    * @api {post} v1/email-templates Create Email Template
    * @apiDescription Create a new email template
@@ -61,7 +65,7 @@ router
    * @apiError (Forbidden 403)     Forbidden        Only admins can create the data
    */
   .post(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.createEmailTemplate),
     controller.create
   );
@@ -85,7 +89,7 @@ router
    * @apiError (Forbidden 403)    Forbidden    Only admins can access the data
    */
   .get(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.getEmailTemplateBySlug),
     controller.getBySlug
   );
@@ -108,7 +112,11 @@ router
    * @apiError (Unauthorized 401) Unauthorized Only authenticated users can access the data
    * @apiError (Forbidden 403)    Forbidden    Only admins can access the data
    */
-  .get(authorize(), validate(validation.getEmailTemplate), controller.get)
+  .get(
+    getAuth("master.admin"),
+    validate(validation.getEmailTemplate),
+    controller.get
+  )
   /**
    * @api {patch} v1/email-templates/:id Update Email Template
    * @apiDescription Update email template
@@ -136,7 +144,7 @@ router
    * @apiError (Forbidden 403)    Forbidden        Only admins can modify the data
    */
   .patch(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.updateEmailTemplate),
     controller.update
   )
@@ -157,7 +165,7 @@ router
    * @apiError (Forbidden 403)    Forbidden    Only admins can delete the data
    */
   .delete(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.deleteEmailTemplate),
     controller.remove
   );
@@ -181,7 +189,7 @@ router
    * @apiError (Forbidden 403)    Forbidden    Only admins can modify the data
    */
   .post(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.toggleEmailTemplateStatus),
     controller.toggleStatus
   );
@@ -207,7 +215,7 @@ router
    * @apiError (Forbidden 403)    Forbidden    Only admins can access the data
    */
   .post(
-    authorize(),
+    getAuth("master.admin"),
     validate(validation.previewEmailTemplate),
     controller.preview
   );

@@ -9,33 +9,59 @@ exports.list = async (req, res, next) => {
   try {
     const {
       page = 1,
-      perPage = 20,
+      limit = 10,
       search = "",
       event_type = "",
       recipient_type = "",
       is_active,
+      sortBy = "createdAt",
+      sortDesc = "desc",
     } = req.query;
 
-    const templates = await EmailTemplate.list({
-      page: parseInt(page),
-      perPage: parseInt(perPage),
-      search,
-      event_type,
-      recipient_type,
-      is_active: is_active !== undefined ? is_active === "true" : null,
-    });
+    // Build query condition
+    const condition = {};
 
-    res.json({
-      code: httpStatus.OK,
-      message: "Email templates retrieved successfully",
-      data: templates.docs,
-      pagination: {
-        total: templates.totalDocs,
-        page: templates.page,
-        pages: templates.totalPages,
-        perPage: templates.limit,
+    if (search) {
+      condition.$or = [
+        { name: { $regex: new RegExp(search), $options: "i" } },
+        { slug: { $regex: new RegExp(search), $options: "i" } },
+        { subject: { $regex: new RegExp(search), $options: "i" } },
+      ];
+    }
+
+    if (event_type) {
+      condition.event_type = event_type;
+    }
+
+    if (recipient_type) {
+      condition.recipient_type = recipient_type;
+    }
+
+    if (is_active !== undefined && is_active !== "") {
+      condition.is_active = is_active === "true" || is_active === true;
+    }
+
+    // Build sort object
+    let sort = {};
+    if (sortBy && sortDesc) {
+      sort = { [sortBy]: sortDesc === "desc" ? -1 : 1 };
+    }
+
+    // Pagination options
+    const paginationOptions = {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 10,
+      collation: { locale: "en" },
+      customLabels: {
+        totalDocs: "totalRecords",
+        docs: "items",
       },
-    });
+      sort,
+      lean: true,
+    };
+
+    const result = await EmailTemplate.paginate(condition, paginationOptions);
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -263,6 +289,7 @@ exports.toggleStatus = async (req, res, next) => {
  */
 exports.preview = async (req, res, next) => {
   try {
+    const emailService = require("../services/emailService");
     const template = await EmailTemplate.findById(req.params.id);
 
     if (!template) {
@@ -273,14 +300,19 @@ exports.preview = async (req, res, next) => {
     }
 
     const variables = req.body.variables || {};
-    const formatted = EmailTemplate.formatTemplate(template, variables);
+    const rendered = await emailService.previewEmail(
+      template.subject,
+      template.body,
+      variables
+    );
 
     res.json({
       code: httpStatus.OK,
       message: "Email template preview generated successfully",
       data: {
-        subject: formatted.subject,
-        body: formatted.body,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
         original_subject: template.subject,
         original_body: template.body,
         variables_used: template.variables,

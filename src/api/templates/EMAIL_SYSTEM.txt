@@ -1,0 +1,15 @@
+# Email Template System - Documentation
+
+See the full documentation in the main project README or contact the development team.
+
+## Quick Start
+
+1. Templates are stored in database with only content
+2. Base HTML wrapper is in `email-base.html`
+3. Use `emailService.js` to render and send emails
+4. See `emailService.examples.js` for usage examples
+
+## Key Files
+- `email-base.html` - Base HTML template
+- `../services/emailService.js` - Email rendering service
+- `../seeders/emailTemplate.seeder.js` - Template seeds
