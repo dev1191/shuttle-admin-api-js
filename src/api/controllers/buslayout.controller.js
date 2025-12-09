@@ -11,7 +11,7 @@ exports.load = async (req, res, next) => {
     try {
       let condition = req.query.search != ""
           ? {
-              label: {
+              name: {
                 $regex: `(\s+${req.query.search}|^${req.query.search})`,
                 $options: "i",
               },

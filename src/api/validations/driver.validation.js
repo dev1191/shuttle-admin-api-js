@@ -1,31 +1,32 @@
-const Joi = require('joi');
+const Joi = require("joi");
 const { objectId } = require("./custom.validation");
 
-
 const listDrivers = {
-  query: Joi.object().keys({
-    search:Joi.string().allow(null, ''),
-    page: Joi.number().min(1),
-    limit: Joi.number().min(1).max(100),
-    firstname: Joi.string(),
-    lastname: Joi.string(),
-    phone: Joi.string(),
-    email: Joi.string(),
-    status: Joi.boolean(),
-  }).unknown()
-}
-
-
+  query: Joi.object()
+    .keys({
+      search: Joi.string().allow(null, ""),
+      page: Joi.number().min(1),
+      limit: Joi.number().min(1).max(100),
+      firstname: Joi.string(),
+      lastname: Joi.string(),
+      phone: Joi.string(),
+      email: Joi.string(),
+      status: Joi.string(),
+    })
+    .unknown(),
+};
 
 const createDriver = {
-  body: Joi.object().keys({
-    adminId: Joi.string().custom(objectId),
-    email: Joi.string().email(),
-    firstname: Joi.string(),
-    lastname: Joi.string(),
-    phone: Joi.string(),
-    status: Joi.boolean(),
-  }).unknown(),
+  body: Joi.object()
+    .keys({
+      adminId: Joi.string().custom(objectId),
+      email: Joi.string().email(),
+      firstname: Joi.string(),
+      lastname: Joi.string(),
+      phone: Joi.string(),
+      status: Joi.string(),
+    })
+    .unknown(),
 };
 
 const updateDriver = {
@@ -39,11 +40,12 @@ const updateDriver = {
       firstname: Joi.string(),
       lastname: Joi.string(),
       phone: Joi.string(),
-      status: Joi.boolean(),
-    }).unknown()
+      status: Joi.string(),
+      type: Joi.string(),
+    })
+    .unknown()
     .min(1),
 };
-
 
 const deleteDriver = {
   params: Joi.object().keys({
@@ -58,5 +60,5 @@ module.exports = {
   createDriver,
   // PATCH /v1/drivers/:driverId
   updateDriver,
-  deleteDriver
+  deleteDriver,
 };

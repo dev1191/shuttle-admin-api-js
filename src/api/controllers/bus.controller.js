@@ -1,4 +1,5 @@
 const httpStatus = require("http-status");
+const mongoose = require("mongoose");
 const { omit, isEmpty } = require("lodash");
 const { VARIANT_ALSO_NEGOTIATES } = require("http-status");
 const { v4: uuidv4 } = require("uuid");
@@ -293,7 +294,7 @@ exports.create = async (req, res, next) => {
     const {
       bustypeId,
       buslayoutId,
-      adminId,
+      operatorId,
       name,
       brand,
       model_no,
@@ -308,9 +309,23 @@ exports.create = async (req, res, next) => {
       certificate_permit,
       status,
     } = req.body;
+
+    // Determine operatorId: use from body, or from logged-in user if operator role
+    let finalOperatorId = operatorId;
+    if (req.user && req.user.role === "operator") {
+      finalOperatorId = req.user._id; // Operators can only create buses for themselves
+    }
+
+    if (!finalOperatorId) {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Operator ID is required",
+      });
+    }
+
     const FolderName = process.env.S3_BUCKET_BUS;
     const objBus = {
-      adminId,
+      operatorId: finalOperatorId,
       bustypeId,
       buslayoutId,
       name,
@@ -378,10 +393,24 @@ exports.update = async (req, res, next) => {
 
     // Full update with image processing
     const busexists = await Bus.findById(req.params.busId).exec();
+
+    // Check operator ownership
+    if (req.user && req.user.role === "operator") {
+      if (
+        !busexists.operatorId ||
+        busexists.operatorId.toString() !== req.user._id.toString()
+      ) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          status: false,
+          message: "You do not have permission to update this bus",
+        });
+      }
+    }
+
     const FolderName = process.env.S3_BUCKET_BUS;
 
     const objUpdate = {
-      adminId: req.body.adminId,
+      operatorId: req.body.operatorId || busexists.operatorId,
       bustypeId: req.body.bustypeId,
       buslayoutId: req.body.buslayoutId,
       name: req.body.name,
@@ -481,6 +510,16 @@ exports.list = async (req, res, next) => {
         }
       : {};
 
+    // Filter by operator if user is an operator
+    if (req.user && req.user.role === "operator") {
+      condition.operatorId = req.user._id;
+    }
+
+    // Allow filtering by specific operatorId (admin only)
+    if (req.query.operatorId && req.user && req.user.role !== "operator") {
+      condition.operatorId = new mongoose.Types.ObjectId(req.query.operatorId);
+    }
+
     let sort = {};
     if (req.query.sortBy != "" && req.query.sortDesc != "") {
       sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
@@ -490,14 +529,14 @@ exports.list = async (req, res, next) => {
       {
         $lookup: {
           from: "admins",
-          localField: "adminId",
+          localField: "operatorId",
           foreignField: "_id",
-          as: "admin",
+          as: "operator",
         },
       },
       {
         $unwind: {
-          path: "$admin",
+          path: "$operator",
           preserveNullAndEmptyArrays: true,
         },
       },
@@ -535,7 +574,14 @@ exports.list = async (req, res, next) => {
           type: { $ifNull: ["$bustype.name", ""] },
           layout: { $ifNull: ["$buslayout.name", ""] },
           max_seats: { $ifNull: ["$buslayout.max_seats", ""] },
-          created_by: { $ifNull: ["$admin.firstname", "-"] },
+          operator_name: {
+            $concat: [
+              { $ifNull: ["$operator.firstname", ""] },
+              " ",
+              { $ifNull: ["$operator.lastname", ""] },
+            ],
+          },
+          operatorId: "$operatorId",
           picture: 1,
           amenities: 1,
           certificate_registration: 1,

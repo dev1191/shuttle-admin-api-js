@@ -1,12 +1,12 @@
-const mongoose = require('mongoose');
-const httpStatus = require('http-status');
-const { omitBy, isNil } = require('lodash');
-const bcrypt = require('bcryptjs');
-const moment = require('moment-timezone');
-const jwt = require('jwt-simple');
-const { v4: uuidv4 } = require('uuid');
-const paginateAggregate = require('mongoose-aggregate-paginate-v2');
-const APIError = require('../utils/APIError');
+const mongoose = require("mongoose");
+const httpStatus = require("http-status");
+const { omitBy, isNil } = require("lodash");
+const bcrypt = require("bcryptjs");
+const moment = require("moment-timezone");
+const jwt = require("jwt-simple");
+const { v4: uuidv4 } = require("uuid");
+const paginateAggregate = require("mongoose-aggregate-paginate-v2");
+const APIError = require("../utils/APIError");
 const {
   BASEURL,
   FULLBASEURL,
@@ -14,18 +14,19 @@ const {
   env,
   jwtSecret,
   jwtExpirationInterval,
-} = require('../../config/vars');
+} = require("../../config/vars");
 const AdminDetail = require("./adminDetail.model");
 /**
  * Admin Roles
  */
 const roles = [
-  'admin',
-  'super-admin',
-  'agent',
-  'supervisor',
-  'manager',
-  'staff',
+  "admin",
+  "super-admin",
+  "agent",
+  "supervisor",
+  "manager",
+  "staff",
+  "operator",
 ];
 
 /**
@@ -59,7 +60,7 @@ const adminSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
-    country_code:{type:String,default:'91'},
+    country_code: { type: String, default: "91" },
     phone: {
       type: String,
       trim: true,
@@ -71,20 +72,20 @@ const adminSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      default: '',
+      default: "",
     },
-    roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
+    roleId: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
     picture: {
       type: String,
       trim: true,
-      default: 'default.jpg',
+      default: "default.jpg",
     },
     is_active: { type: Boolean, default: false },
     last_login: { type: Date, default: new Date() },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 /**
@@ -93,11 +94,11 @@ const adminSchema = new mongoose.Schema(
  * - validations
  * - virtuals
  */
-adminSchema.pre('save', async function save(next) {
+adminSchema.pre("save", async function save(next) {
   try {
-    if (!this.isModified('password')) return next();
+    if (!this.isModified("password")) return next();
 
-    const rounds = env === 'test' ? 1 : 10;
+    const rounds = env === "test" ? 1 : 10;
 
     const hash = await bcrypt.hash(this.password, rounds);
     this.password = hash;
@@ -115,25 +116,25 @@ adminSchema.method({
   transform() {
     const transformed = {};
     const fields = [
-      'id',
-      'firstname',
-      'lastname',
-      'phone',
-      'email',
-      'picture',
-      'role',
-      'roleId',
-      'city',
-      'pincode',
-      'is_agent',
-      'commission',
-      'company',
-      'address_1',
-      'address_2',
-      'contact_no',
-      'document_pan_card',
-      'document_gst_certificate',
-      'createdAt',
+      "id",
+      "firstname",
+      "lastname",
+      "phone",
+      "email",
+      "picture",
+      "role",
+      "roleId",
+      "city",
+      "pincode",
+      "is_agent",
+      "commission",
+      "company",
+      "address_1",
+      "address_2",
+      "contact_no",
+      "document_pan_card",
+      "document_gst_certificate",
+      "createdAt",
     ];
 
     fields.forEach((field) => {
@@ -145,13 +146,13 @@ adminSchema.method({
 
   token() {
     const payload = {
-      exp: moment().add(jwtExpirationInterval, 'minutes').unix(),
+      exp: moment().add(jwtExpirationInterval, "minutes").unix(),
       iat: moment().unix(),
       sub: this._id,
-      type: 'Bearer',
+      type: "Bearer",
       roleId: this.roleId,
     };
-    return jwt.encode(payload, jwtSecret);  
+    return jwt.encode(payload, jwtSecret);
   },
 
   async passwordMatches(password) {
@@ -159,18 +160,17 @@ adminSchema.method({
   },
 });
 
-adminSchema.virtual('admin_details', {
-  ref: 'Admin_Detail', // the model to use
-  localField: '_id', // find children where 'localField'
-  foreignField: 'adminId', // is equal to foreignField
+adminSchema.virtual("admin_details", {
+  ref: "Admin_Detail", // the model to use
+  localField: "_id", // find children where 'localField'
+  foreignField: "adminId", // is equal to foreignField
   justOne: true,
 });
 
-
-adminSchema.virtual('roles', {
-  ref: 'Role', // the model to use
-  localField: 'roleId', // find children where 'localField'
-  foreignField: '_id', // is equal to foreignField
+adminSchema.virtual("roles", {
+  ref: "Role", // the model to use
+  localField: "roleId", // find children where 'localField'
+  foreignField: "_id", // is equal to foreignField
   justOne: true,
 });
 
@@ -191,7 +191,9 @@ adminSchema.statics = {
       let admin;
 
       if (mongoose.Types.ObjectId.isValid(id)) {
-        admin = await this.findById(id).populate(['admin_details', 'roles']).lean();
+        admin = await this.findById(id)
+          .populate(["admin_details", "roles"])
+          .lean();
       }
 
       if (admin) {
@@ -199,7 +201,7 @@ adminSchema.statics = {
       }
 
       throw new APIError({
-        message: 'Admin does not exist',
+        message: "Admin does not exist",
         status: httpStatus.NOT_FOUND,
       });
     } catch (error) {
@@ -217,7 +219,7 @@ adminSchema.statics = {
     const { email, password, refreshObject } = options;
     if (!email) {
       throw new APIError({
-        message: 'An email is required to generate a token',
+        message: "An email is required to generate a token",
       });
     }
 
@@ -226,16 +228,16 @@ adminSchema.statics = {
     //  console.log('admindetail',admindetail);
     admin.city = admindetail.city;
     admin.is_agent = admindetail.is_agent;
-    admin.company = admindetail.is_agent ? admindetail.company : '';
-    admin.pincode = admindetail.is_agent ? admindetail.pincode : '';
+    admin.company = admindetail.is_agent ? admindetail.company : "";
+    admin.pincode = admindetail.is_agent ? admindetail.pincode : "";
     admin.document_pan_card = admindetail.is_agent
       ? admindetail.document_pan_card
-      : '';
+      : "";
     admin.document_gst_certificate = admindetail.is_agent
       ? admindetail.document_gst_certificate
-      : '';
-    admin.contact_no = admindetail.is_agent ? admindetail.contact_no : '';
-    admin.commission = admindetail.is_agent ? admindetail.commission : '';
+      : "";
+    admin.contact_no = admindetail.is_agent ? admindetail.contact_no : "";
+    admin.commission = admindetail.is_agent ? admindetail.commission : "";
 
     const err = {
       status: httpStatus.UNAUTHORIZED,
@@ -245,15 +247,15 @@ adminSchema.statics = {
       if (admin && (await admin.passwordMatches(password))) {
         return { admin, accessToken: admin.token() };
       }
-      err.message = 'Incorrect password';
+      err.message = "Incorrect password";
     } else if (refreshObject && refreshObject.userEmail === email) {
       if (moment(refreshObject.expires).isBefore()) {
-        err.message = 'Invalid refresh token.';
+        err.message = "Invalid refresh token.";
       } else {
         return { admin, accessToken: admin.token() };
       }
     } else {
-      err.message = 'Incorrect email or refreshToken';
+      err.message = "Incorrect email or refreshToken";
     }
     throw new APIError(err);
   },
@@ -265,9 +267,7 @@ adminSchema.statics = {
    * @param {number} limit - Limit number of admins to be returned.
    * @returns {Promise<Admin[]>}
    */
-  list({
-    page = 1, perPage = 30, firstname, lastname, email, role,
-  }) {
+  list({ page = 1, perPage = 30, firstname, lastname, email, role }) {
     const options = omitBy(
       {
         firstname,
@@ -275,11 +275,11 @@ adminSchema.statics = {
         email,
         role,
       },
-      isNil,
+      isNil
     );
 
     return this.find(options)
-      .populate('adminId')
+      .populate("adminId")
       .sort({ createdAt: -1 })
       .skip(perPage * (page - 1))
       .limit(perPage)
@@ -289,7 +289,7 @@ adminSchema.statics = {
     const selectableItems = [];
     let i = 1;
 
-    console.log('rows', rows);
+    console.log("rows", rows);
     rows.forEach((item) => {
       selectableItems.push({
         id: i++,
@@ -304,21 +304,23 @@ adminSchema.statics = {
           : `${FULLBASEURL}${item.picture}`,
         address_1: item.admin_details.is_agent
           ? item.admin_details.address_1
-          : '',
+          : "",
         address_2: item.admin_details.is_agent
           ? item.admin_details.address_2
-          : '',
-        city: item.admin_details.is_agent ? item.admin_details.city : '',
+          : "",
+        city: item.admin_details.is_agent ? item.admin_details.city : "",
         contact_no: item.admin_details.is_agent
           ? item.admin_details.contact_no
-          : '',
-        pincode: item.admin_details.is_agent ? item.admin_details.pincode : '',
-        company: item.admin_details.is_agent ? item.admin_details.company : '',
+          : "",
+        pincode: item.admin_details.is_agent ? item.admin_details.pincode : "",
+        company: item.admin_details.is_agent ? item.admin_details.company : "",
         is_agent: item.admin_details.is_agent,
         commission: item.admin_details.is_agent
           ? item.admin_details.commission
-          : '',
-        document_gst_certificate: this.isValidURL(item.admin_details.document_gst_certificate)
+          : "",
+        document_gst_certificate: this.isValidURL(
+          item.admin_details.document_gst_certificate
+        )
           ? item.admin_details.document_gst_certificate
           : `${FULLBASEURL}${item.admin_details.document_gst_certificate}`,
         document_pan_card: this.isValidURL(item.admin_details.document_pan_card)
@@ -327,8 +329,8 @@ adminSchema.statics = {
         last_login: moment
           .utc(item.last_login)
           .tz(DEFAULT_TIMEZONE)
-          .format('LLL'),
-        is_active: item.is_active == true ? 'Active' : 'Inactive',
+          .format("LLL"),
+        is_active: item.is_active == true ? "Active" : "Inactive",
         createdAt: moment
           .utc(item.createdAt)
           .tz(DEFAULT_TIMEZONE)
@@ -338,14 +340,16 @@ adminSchema.statics = {
     return selectableItems;
   },
   isValidURL(str) {
-    const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
+    const regex =
+      /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
     if (!regex.test(str)) {
       return false;
     }
     return true;
   },
   isValidBase64(str) {
-    const regex = /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
+    const regex =
+      /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
 
     if (regex.test(str)) {
       return true;
@@ -360,13 +364,13 @@ adminSchema.statics = {
    * @returns {Error|APIError}
    */
   checkDuplicateEmail(error) {
-    if (error.name === 'MongoError' && error.code === 11000) {
+    if (error.name === "MongoError" && error.code === 11000) {
       return new APIError({
-        message: 'Validation Error',
+        message: "Validation Error",
         errors: [
           {
-            field: 'email',
-            location: 'body',
+            field: "email",
+            location: "body",
             messages: ['"email" already exists'],
           },
         ],
@@ -378,9 +382,7 @@ adminSchema.statics = {
     return error;
   },
 
-  async oAuthLogin({
-    service, id, email, name, picture,
-  }) {
+  async oAuthLogin({ service, id, email, name, picture }) {
     const admin = await this.findOne({
       $or: [{ [`services.${service}`]: id }, { email }],
     });
@@ -405,4 +407,4 @@ adminSchema.plugin(paginateAggregate);
 /**
  * @typedef Admin
  */
-module.exports = mongoose.model('Admin', adminSchema);
+module.exports = mongoose.model("Admin", adminSchema);

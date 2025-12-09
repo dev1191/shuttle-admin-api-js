@@ -478,8 +478,9 @@ const emailTemplates = [
  */
 const seedEmailTemplates = async () => {
   try {
+       await EmailTemplate.deleteMany({});
     console.log("Seeding email templates...");
-    await EmailTemplate.deleteMany({});
+ 
     for (const templateData of emailTemplates) {
       const existingTemplate = await EmailTemplate.findOne({
         slug: templateData.slug,

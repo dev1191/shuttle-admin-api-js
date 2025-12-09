@@ -11,10 +11,11 @@ const { env, FULLBASEURL } = require("../../config/vars");
  */
 const driverSchema = new mongoose.Schema(
   {
-    adminId: {
+    operatorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",
       required: true,
+      index: true,
     },
     currentLocation: {
       type: { type: String, default: "Point" },
@@ -74,7 +75,18 @@ const driverSchema = new mongoose.Schema(
       type: String,
       default: "default.jpg",
     },
-    status: { type: Boolean, default: true, index: true },
+    status: {
+      type: String,
+      enum: [
+        "Active",
+        "Inactive",
+        "OnRoute",
+        "Breakdown",
+        "Idle",
+        "Maintenance",
+      ],
+      index: true,
+    },
     duty_status: {
       type: String,
       enum: ["ONLINE", "TRACK", "OFFLINE"],
@@ -115,7 +127,7 @@ driverSchema.method({
     const transformed = {};
     const fields = [
       "id",
-      "adminId",
+      "operatorId",
       "firstname",
       "lastname",
       "country_code",
@@ -263,11 +275,11 @@ driverSchema.statics = {
     const selectableItems = [];
     let i = 1;
     rows.forEach((item) => {
-      if (item.adminId) {
+      if (item.operatorId) {
         selectableItems.push({
           id: i++,
           ids: item.id,
-          agent_name: item.adminId.firstname + " " + item.adminId.lastname,
+          operator_name: `${item.operatorId.firstname} ${item.operatorId.lastname}`,
           firstname: item.firstname,
           lastname: item.lastname,
           email: item.email,
@@ -299,14 +311,16 @@ driverSchema.statics = {
     return selectableItems;
   },
   isValidURL(str) {
-    const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
+    const regex =
+      /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
     if (!regex.test(str)) {
       return false;
     }
     return true;
   },
   isValidBase64(str) {
-    const regex = /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
+    const regex =
+      /^data:image\/(?:gif|png|jpeg|jpg|bmp|webp)(?:;charset=utf-8)?;base64,(?:[A-Za-z0-9]|[+/])+={0,2}/g;
 
     if (regex.test(str)) {
       return true;

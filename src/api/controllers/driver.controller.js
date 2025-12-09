@@ -75,7 +75,7 @@ exports.get = async (req, res, next) => {
         $project: {
           _id: 0,
           id: "$_id",
-          adminId: 1,
+          operatorId: 1,
           firstname: 1,
           lastname: 1,
           country_code: 1,
@@ -369,7 +369,7 @@ exports.uploadDocument = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const {
-      adminId,
+      operatorId,
       firstname,
       lastname,
       email,
@@ -383,9 +383,23 @@ exports.create = async (req, res, next) => {
       document_national_icard,
       document_police_vertification,
     } = req.body;
+
+    // Determine operatorId: use from body, or from logged-in user if operator role
+    let finalOperatorId = operatorId;
+    if (req.user && req.user.role === "operator") {
+      finalOperatorId = req.user._id; // Operators can only create drivers for themselves
+    }
+
+    if (!finalOperatorId) {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Operator ID is required",
+      });
+    }
+
     const FolderName = process.env.S3_BUCKET_DRIVERDOC;
     const objDriver = {
-      adminId,
+      operatorId: finalOperatorId,
       firstname,
       lastname,
       email,
@@ -478,9 +492,22 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const driverexists = await Driver.findById(req.params.driverId).exec();
-    const FolderName = process.env.S3_BUCKET_DRIVERDOC;
+
+    // Check operator ownership
+    if (req.user && req.user.role === "operator") {
+      if (
+        !driverexists.operatorId ||
+        driverexists.operatorId.toString() !== req.user._id.toString()
+      ) {
+        return res.status(httpStatus.FORBIDDEN).json({
+          status: false,
+          message: "You do not have permission to update this driver",
+        });
+      }
+    }
+
     const objUpdate = {
-      adminId: req.body.adminId,
+      operatorId: req.body.operatorId || driverexists.operatorId,
       firstname: req.body.firstname,
       lastname: req.body.lastname,
       email: req.body.email,
@@ -489,73 +516,11 @@ exports.update = async (req, res, next) => {
       status: req.body.status,
       type: req.body.type,
       national_id: req.body.national_id,
+      picture: req.body.picture,
+      document_licence: req.body.document_licence,
+      document_national_icard: req.body.document_national_icard,
+      document_police_vertification: req.body.document_police_vertification,
     };
-
-    const isProductionS3 = await Setting.gets3();
-
-    if (Driver.isValidBase64(req.body.picture)) {
-      if (isProductionS3.is_production) {
-        await imageDelete(driverexists.picture, FolderName);
-        objUpdate.picture = await imageUpload(
-          req.body.picture,
-          `profile-${uuidv4()}`,
-          process.env.S3_BUCKET_DRIVER_PROFILE
-        );
-      } else {
-        objDriver.picture = await uploadLocal(picture, FolderName);
-      }
-    }
-
-    if (Driver.isValidBase64(req.body.document_licence)) {
-      if (isProductionS3.is_production) {
-        await imageDelete(driverexists.document_licence, FolderName);
-        objUpdate.document_licence = await imageUpload(
-          req.body.document_licence,
-          `document_licence_${uuidv4()}`,
-          FolderName
-        );
-      } else {
-        objDriver.document_licence = await uploadLocal(
-          req.body.document_licence,
-          FolderName
-        );
-      }
-    }
-
-    if (Driver.isValidBase64(req.body.document_national_icard)) {
-      if (isProductionS3.is_production) {
-        await imageDelete(driverexists.document_national_icard, FolderName);
-        objUpdate.document_national_icard = await imageUpload(
-          req.body.document_national_icard,
-          `document_national_icard_${uuidv4()}`,
-          FolderName
-        );
-      } else {
-        objDriver.document_national_icard = await uploadLocal(
-          req.body.document_national_icard,
-          FolderName
-        );
-      }
-    }
-
-    if (Driver.isValidBase64(req.body.document_police_vertification)) {
-      if (isProductionS3.is_production) {
-        await imageDelete(
-          driverexists.document_police_vertification,
-          FolderName
-        );
-        objUpdate.document_police_vertification = await imageUpload(
-          req.body.document_police_vertification,
-          `document_police_vertification_${uuidv4()}`,
-          FolderName
-        );
-      } else {
-        objDriver.document_police_vertification = await uploadLocal(
-          req.body.document_police_vertification,
-          FolderName
-        );
-      }
-    }
 
     const updatedrivers = await Driver.findByIdAndUpdate(
       req.params.driverId,
@@ -634,10 +599,9 @@ exports.list = async (req, res, next) => {
         };
 
     let sort = {};
-    if (req.query.sortBy != '' && req.query.sortDesc != '') {
+    if (req.query.sortBy != "" && req.query.sortDesc != "") {
       sort = { [req.query.sortBy]: req.query.sortDesc === "desc" ? -1 : 1 };
-    } 
-
+    }
 
     let newquery = {};
     if (req.query.createdAt) {
@@ -649,34 +613,45 @@ exports.list = async (req, res, next) => {
       };
       newquery.is_deleted = false;
     } else if (req.query.status) {
-      newquery.status = req.query.status ? true: false;
+      newquery.status = req.query.status ? true : false;
       newquery.is_deleted = false;
     }
     condition = { ...condition, ...newquery };
+
+    // Filter by operator if user is an operator
+    if (req.user && req.user.role === "operator") {
+      condition.operatorId = req.user._id;
+    }
+
+    // Allow filtering by specific operatorId (admin only)
+    if (req.query.operatorId && req.user && req.user.role !== "operator") {
+      condition.operatorId = new mongoose.Types.ObjectId(req.query.operatorId);
+    }
 
     const aggregateQuery = Driver.aggregate([
       {
         $lookup: {
           from: "admins",
-          localField: "adminId",
+          localField: "operatorId",
           foreignField: "_id",
-          as: "admin",
+          as: "operator",
         },
       },
       {
-        $unwind: "$admin",
+        $unwind: "$operator",
       },
       {
         $project: {
           _id: 0,
           ids: "$_id",
           is_deleted: 1,
-          agent_name: {
+          operator_name: {
             $ifNull: [
-              { $concat: ["$admin.firstname", " ", "$admin.lastname"] },
+              { $concat: ["$operator.firstname", " ", "$operator.lastname"] },
               "-",
             ],
           },
+          operatorId: "$operatorId",
           firstname: 1,
           lastname: 1,
           country_code: 1,

@@ -88,6 +88,16 @@ const bookingSchema = new mongoose.Schema(
     ip: { type: String, default: "0.0.0.0" },
     booking_date: { type: Date, default: null },
     bus_depature_date: { type: Date, default: null },
+
+    // Operator-related fields for multi-vendor support
+    operatorId: {
+      type: ObjectId,
+      ref: "Admin",
+      index: true,
+    },
+    platform_commission_percentage: { type: Number, default: 0 },
+    platform_commission: { type: Number, default: 0 },
+    operator_earnings: { type: Number, default: 0 },
   },
   {
     timestamps: true,

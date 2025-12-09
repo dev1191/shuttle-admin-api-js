@@ -1,8 +1,8 @@
-const httpStatus = require('http-status');
-const { v4: uuidv4 } = require('uuid');
-const { URL } = require('url');
-const APIError = require('../utils/APIError');
-const { handleImageUpload } = require('../utils/imageHandler');
+const httpStatus = require("http-status");
+const { v4: uuidv4 } = require("uuid");
+const { URL } = require("url");
+const APIError = require("../utils/APIError");
+const { handleImageUpload } = require("../utils/imageHandler");
 
 /**
  * Upload single or multiple files
@@ -12,8 +12,9 @@ const { handleImageUpload } = require('../utils/imageHandler');
  */
 exports.create = async (req, res, next) => {
   try {
-    const folderName = req.body.folder || process.env.S3_BUCKET_USERPRO || 'uploads';
-    const resize = req.body.resize === 'true' || req.body.resize === true;
+    const folderName =
+      req.body.folder || process.env.S3_BUCKET_USERPRO || "uploads";
+    const resize = req.body.resize === "true" || req.body.resize === true;
     const width = parseInt(req.body.width) || 0;
     const height = parseInt(req.body.height) || 0;
 
@@ -29,27 +30,36 @@ exports.create = async (req, res, next) => {
     if (fileArray.length === 0) {
       return res.status(httpStatus.BAD_REQUEST).json({
         status: false,
-        message: 'No files provided',
+        message: "No files provided",
       });
     }
 
-    const uploadOptions = { resize, filenamePrefix: 'upload' };
+    const uploadOptions = { resize, filenamePrefix: "upload" };
     if (width > 0) uploadOptions.width = width;
     if (height > 0) uploadOptions.height = height;
 
     // Upload all files concurrently
     const uploadPromises = fileArray.map(async (file) => {
       try {
-        const url = await handleImageUpload(file, null, folderName, uploadOptions);
+        const url = await handleImageUpload(
+          file,
+          null,
+          folderName,
+          uploadOptions
+        );
 
         // Ensure uploader returned a string URL. Some upload helpers return an Error or object on failure.
         let finalUrl = url;
-        if (typeof finalUrl !== 'string') {
+        if (typeof finalUrl !== "string") {
           // if cloudinary/uploader returned an object with url property, use it
-          if (finalUrl && typeof finalUrl.url === 'string') {
+          if (finalUrl && typeof finalUrl.url === "string") {
             finalUrl = finalUrl.url;
           } else {
-            console.error('Upload helper returned non-string result for file', file.name, finalUrl);
+            console.error(
+              "Upload helper returned non-string result for file",
+              file.name,
+              finalUrl
+            );
             return null; // skip this file
           }
         }
@@ -57,7 +67,10 @@ exports.create = async (req, res, next) => {
         // derive a path value: use pathname if URL, otherwise return as-is
         let pathVal = finalUrl;
         try {
-          if (typeof finalUrl === 'string' && (finalUrl.startsWith('http://') || finalUrl.startsWith('https://'))) {
+          if (
+            typeof finalUrl === "string" &&
+            (finalUrl.startsWith("http://") || finalUrl.startsWith("https://"))
+          ) {
             pathVal = new URL(finalUrl).pathname;
             // If a folderName was provided, prefer the path starting at that folder (e.g. '/stops/...')
             if (folderName) {
@@ -79,8 +92,8 @@ exports.create = async (req, res, next) => {
 
         return {
           id: uuidv4(),
-          name: file.name || 'unnamed',
-          type: file.mimetype || 'unknown',
+          name: file.name || "unnamed",
+          type: file.mimetype || "unknown",
           url: finalUrl,
           path: pathVal,
           size: file.size || 0,
@@ -97,7 +110,7 @@ exports.create = async (req, res, next) => {
 
     if (successful.length === 0) {
       throw new APIError({
-        message: 'All file uploads failed',
+        message: "All file uploads failed",
         status: httpStatus.INTERNAL_SERVER_ERROR,
       });
     }
@@ -129,7 +142,7 @@ exports.update = async (req, res, next) => {
     if (!fileId) {
       return res.status(httpStatus.BAD_REQUEST).json({
         status: false,
-        message: 'fileId is required',
+        message: "fileId is required",
       });
     }
 
@@ -138,17 +151,17 @@ exports.update = async (req, res, next) => {
     // For now, return updated metadata
     const updatedFile = {
       id: fileId,
-      name: newName || 'unnamed',
-      folder: newFolder || 'uploads',
+      name: newName || "unnamed",
+      folder: newFolder || "uploads",
       // path is not known in metadata-only update; provide folder as path
-      path: newFolder || 'uploads',
+      path: newFolder || "uploads",
       updatedAt: new Date(),
     };
 
     // Return updated path (string)
     res.status(httpStatus.OK).json({
       status: true,
-      message: 'File metadata updated successfully.',
+      message: "File metadata updated successfully.",
       data: updatedFile.path,
     });
   } catch (error) {
@@ -166,10 +179,10 @@ exports.delete = async (req, res, next) => {
   try {
     const { url } = req.body;
 
-    if (!fileUrl && !fileId) {
+    if (!url) {
       return res.status(httpStatus.BAD_REQUEST).json({
         status: false,
-        message: 'fileUrl or fileId is required',
+        message: "fileUrl or fileId is required",
       });
     }
 
@@ -180,9 +193,13 @@ exports.delete = async (req, res, next) => {
     // For now, just return success response
 
     // derive deleted path
-    let deletedPath = fileUrl || null;
+    let deletedPath = url || null;
     try {
-      if (deletedPath && (deletedPath.startsWith('http://') || deletedPath.startsWith('https://'))) {
+      if (
+        deletedPath &&
+        (deletedPath.startsWith("http://") ||
+          deletedPath.startsWith("https://"))
+      ) {
         deletedPath = new URL(deletedPath).pathname;
       }
     } catch (e) {
@@ -191,12 +208,9 @@ exports.delete = async (req, res, next) => {
 
     res.status(httpStatus.OK).json({
       status: true,
-      message: 'File deleted successfully.',
+      message: "File deleted successfully.",
       data: {
-        deletedFileUrl: fileUrl,
         deletedFilePath: deletedPath,
-        deletedFileId: fileId,
-        deletedAt: new Date(),
       },
     });
   } catch (error) {
@@ -214,7 +228,7 @@ exports.list = async (req, res, next) => {
     // Placeholder: In production, fetch from DB with pagination
     res.status(httpStatus.OK).json({
       status: true,
-      message: 'File list retrieved.',
+      message: "File list retrieved.",
       data: [],
       totalRecords: 0,
     });

@@ -1,12 +1,20 @@
-const mongoose = require('mongoose');
-const { omitBy, isNil } = require('lodash');
-const mongoosePaginate = require('mongoose-paginate-v2');
-const paginateAggregate = require('mongoose-aggregate-paginate-v2');
+const mongoose = require("mongoose");
+const { omitBy, isNil } = require("lodash");
+const mongoosePaginate = require("mongoose-paginate-v2");
+const paginateAggregate = require("mongoose-aggregate-paginate-v2");
 const { Schema } = mongoose;
 const { ObjectId } = Schema;
-const moment = require('moment-timezone');
+const moment = require("moment-timezone");
 
-const routines = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const routines = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
 
 // const routineSchema = new Schema({
 //   routine: { type: [String],default: [''], required: true },
@@ -14,31 +22,39 @@ const routines = ['sunday','monday','tuesday','wednesday','thursday','friday','s
 
 const BusScheduleSchema = new Schema(
   {
-    routeId: { type: ObjectId, ref: 'Route', required: true },
-    busId: { type: ObjectId, ref: 'Bus' },
-    departure_time: {type: Number},
-    arrival_time:{type: Number},
-    every:{ type: [String],enum:routines},
-    start_date:{type:Date,default:''},
-    end_date:{type:Date,default:''},
-    status: { type: Boolean, default: true }
+    routeId: { type: ObjectId, ref: "Route", required: true },
+    operatorId: { type: ObjectId, ref: "Admin", required: true, index: true },
+    busId: { type: ObjectId, ref: "Bus" },
+    departure_time: { type: Number },
+    arrival_time: { type: Number },
+    every: { type: [String], enum: routines },
+    start_date: { type: Date, default: "" },
+    end_date: { type: Date, default: "" },
+    status: { type: Boolean, default: true },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-
-BusScheduleSchema.virtual('routestops', {
-  ref: 'Route_Stop', // the model to use
-  localField: 'routeId', // find children where 'localField'
-  foreignField: 'routeId', // is equal to foreignField
+BusScheduleSchema.virtual("routestops", {
+  ref: "Route_Stop", // the model to use
+  localField: "routeId", // find children where 'localField'
+  foreignField: "routeId", // is equal to foreignField
   justOne: true,
 });
-
 
 BusScheduleSchema.method({
   transform() {
     const transformed = {};
-    const fields = ['id', 'direction', 'day', 'time','start_date','end_date', 'status', 'createdAt'];
+    const fields = [
+      "id",
+      "direction",
+      "day",
+      "time",
+      "start_date",
+      "end_date",
+      "status",
+      "createdAt",
+    ];
     fields.forEach((field) => {
       transformed[field] = this[field];
     });
@@ -46,56 +62,52 @@ BusScheduleSchema.method({
   },
 });
 
-
 BusScheduleSchema.statics = {
-  async transFormSingleData(row){
-    try{
-      return{
-        id:row.id,
-        every:row.every,
-        direction:row.direction,
-        time:row.time,
-        start_date:row.start_date,
-        end_date:row.end_date,
-        busId:row.busId,
+  async transFormSingleData(row) {
+    try {
+      return {
+        id: row.id,
+        every: row.every,
+        direction: row.direction,
+        time: row.time,
+        start_date: row.start_date,
+        end_date: row.end_date,
+        busId: row.busId,
         routeId: {
-          id:row.routeId._id,
-          title:row.routeId.title
+          id: row.routeId._id,
+          title: row.routeId.title,
         },
-        stops:row.routestops.stops,
+        stops: row.routestops.stops,
         status: row.status,
-      }
-    }catch(err){
-      console.log('err',err)
+      };
+    } catch (err) {
+      console.log("err", err);
       return err;
     }
- 
   },
-  transformData(rows){
+  transformData(rows) {
     const selectableItems = [];
     let i = 1;
     rows.forEach((item) => {
       selectableItems.push({
-        id:i++,
+        id: i++,
         ids: item.id,
-        direction:item.direction,
+        direction: item.direction,
         time: moment(item.time).tz(DEFAULT_TIMEZONE).format("HH:MM A"),
-        bus_name: (item.busId) ? item.busId.name : '',
-       // busId: (item.busId) ? item.busId._id : '',
-        route_name: (item.routeId) ? item.routeId.title : '',
-        routeId: (item.locationId) ? item.routeId._id : '',
+        bus_name: item.busId ? item.busId.name : "",
+        // busId: (item.busId) ? item.busId._id : '',
+        route_name: item.routeId ? item.routeId.title : "",
+        routeId: item.locationId ? item.routeId._id : "",
         status: item.status == true ? "Active" : "Inactive",
-        createdAt: moment(item.createdAt).tz(DEFAULT_TIMEZONE).format("DD MMM YYYY"),
+        createdAt: moment(item.createdAt)
+          .tz(DEFAULT_TIMEZONE)
+          .format("DD MMM YYYY"),
       });
     });
     return selectableItems;
-
   },
-  list({
-    page = 1, perPage = 30, title
-  }) {
-    const options = omitBy({
-    }, isNil);
+  list({ page = 1, perPage = 30, title }) {
+    const options = omitBy({}, isNil);
 
     return this.find(options)
       .sort({ createdAt: -1 })
@@ -103,11 +115,9 @@ BusScheduleSchema.statics = {
       .limit(perPage)
       .exec();
   },
-}
-
+};
 
 BusScheduleSchema.plugin(mongoosePaginate);
 BusScheduleSchema.plugin(paginateAggregate);
 
-
-module.exports = mongoose.model('Bus_Schedule', BusScheduleSchema);
+module.exports = mongoose.model("Bus_Schedule", BusScheduleSchema);

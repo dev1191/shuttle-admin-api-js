@@ -38,6 +38,7 @@ const busScheduleRoutes = require("./busschedule.route");
 const pageRoutes = require("./page.route");
 const uploaderRoutes = require("./uploader.route");
 const emailTemplateRoutes = require("./emailtemplate.route");
+const operatorRoutes = require("./operator.route");
 const router = express.Router();
 
 /**
@@ -88,5 +89,6 @@ router.use("/bus-schedules", busScheduleRoutes);
 router.use("/pages", pageRoutes);
 router.use("/uploader", uploaderRoutes);
 router.use("/email-templates", emailTemplateRoutes);
+router.use("/operators", operatorRoutes);
 
 module.exports = router;

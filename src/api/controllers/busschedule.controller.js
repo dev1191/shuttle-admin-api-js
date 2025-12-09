@@ -89,6 +89,16 @@ exports.list = async (req, res) => {
       condition = { routeId: new mongoose.Types.ObjectId(req.query.routeId) };
     }
 
+    // Filter by operator if user is an operator
+    if (req.user && req.user.role === "operator") {
+      condition.operatorId = req.user._id;
+    }
+
+    // Allow filtering by specific operatorId (admin only)
+    if (req.query.operatorId && req.user && req.user.role !== "operator") {
+      condition.operatorId = new mongoose.Types.ObjectId(req.query.operatorId);
+    }
+
     const aggregateQuery = BusSchedule.aggregate([
       {
         $lookup: {
@@ -214,6 +224,20 @@ exports.list = async (req, res) => {
       },
       {
         $lookup: {
+          from: "admins",
+          localField: "operatorId",
+          foreignField: "_id",
+          as: "operator",
+        },
+      },
+      {
+        $unwind: {
+          path: "$operator",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
           from: "buses",
           localField: "busId",
           foreignField: "_id",
@@ -243,10 +267,18 @@ exports.list = async (req, res) => {
             $ifNull: [{ $concat: ["$bus.name", "(", "$bus.code", ")"] }, "-"],
           },
           route_name: { $ifNull: ["$route.title", "-"] },
+          operator_name: {
+            $concat: [
+              { $ifNull: ["$operator.firstname", ""] },
+              " ",
+              { $ifNull: ["$operator.lastname", ""] },
+            ],
+          },
+          operatorId: "$operatorId",
           start_date: {
             $dateToString: {
               format: "%d-%m-%Y",
-              date: "$start_date"
+              date: "$start_date",
             },
           },
           end_date: {
@@ -494,7 +526,43 @@ exports.create = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { every, routeId, busId, start_date, end_date, stops, status } = req.body;
+    const {
+      every,
+      routeId,
+      busId,
+      start_date,
+      end_date,
+      stops,
+      status,
+      operatorId,
+    } = req.body;
+
+    // Determine operatorId: use from body, or from logged-in user if operator role
+    let finalOperatorId = operatorId;
+    if (req.user && req.user.role === "operator") {
+      finalOperatorId = req.user._id; // Operators can only create schedules for themselves
+    }
+
+    if (!finalOperatorId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(httpStatus.BAD_REQUEST).json({
+        status: false,
+        message: "Operator ID is required",
+      });
+    }
+
+    // Verify bus belongs to operator
+    const Bus = require("../models/bus.model");
+    const bus = await Bus.findById(busId);
+    if (bus && bus.operatorId.toString() !== finalOperatorId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(httpStatus.FORBIDDEN).json({
+        status: false,
+        message: "Bus does not belong to this operator",
+      });
+    }
 
     const busSchedule = await BusSchedule.create(
       [
@@ -502,6 +570,7 @@ exports.create = async (req, res) => {
           every,
           routeId,
           busId,
+          operatorId: finalOperatorId,
           start_date,
           end_date,
           status,
@@ -539,7 +608,8 @@ exports.update = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { every, routeId, busId, start_date, end_date, stops, status } = req.body;
+    const { every, routeId, busId, start_date, end_date, stops, status } =
+      req.body;
 
     const busSchedule = await BusSchedule.findById(
       req.params.busScheduleId
@@ -553,6 +623,21 @@ exports.update = async (req, res, next) => {
         status: false,
         message: "Bus schedule not found",
       });
+    }
+
+    // Check operator ownership
+    if (req.user && req.user.role === "operator") {
+      if (
+        !busSchedule.operatorId ||
+        busSchedule.operatorId.toString() !== req.user._id.toString()
+      ) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(httpStatus.FORBIDDEN).json({
+          status: false,
+          message: "You do not have permission to update this schedule",
+        });
+      }
     }
 
     const updateObj = {
